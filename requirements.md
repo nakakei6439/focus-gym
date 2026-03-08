@@ -170,16 +170,96 @@ FocusGym
 
 ------------------------------------------------------------------------
 
-## 10. 技術想定
+## 10. 技術スタック
 
 | 用途 | 採用技術 | 備考 |
 |------|----------|------|
-| フロントエンド | Flutter 3.x（Dart 3.x） | iOS / Android 単一コードベース |
-| ローカルDB | Hive（hive / hive_flutter） | TypeAdapter は hive_generator + build_runner で自動生成 |
+| フロントエンド | Flutter 3.x / Dart 3.x | iOS / Android 単一コードベース |
+| ローカルDB | Hive + hive_flutter + hive_generator | TypeAdapter は build_runner で自動生成 |
 | 通知機能 | flutter_local_notifications | Firebase不要・ソロMVP向け。将来的にFCMへ移行可 |
-| 画面遷移 | go_router | 宣言的ルーティング |
-| カレンダーUI | table_calendar | 履歴画面の月間カレンダー |
+| 画面遷移 | go_router 14.0.0 | 宣言的ルーティング |
+| カレンダーUI | table_calendar 3.1.0 | 履歴画面の月間カレンダー |
 | コード生成 | build_runner | Hive TypeAdapter 自動生成 |
+| 状態管理 | setState / InheritedWidget | **Riverpod は使用しない** |
+| アーキテクチャ | Feature-first ディレクトリ構成 | — |
+
+------------------------------------------------------------------------
+
+## 12. 実装済み機能
+
+### Phase 1: プロジェクト立ち上げ（完了）
+
+-   `requirements.md` 作成（MVP要件定義）
+-   `flutter create focus_gym --org com.focusgym --platforms ios,android` でプロジェクト生成
+-   Feature-first ディレクトリ構成を設計・採用
+
+### Phase 2: コア機能実装（完了）
+
+**6種類のトレーニング**（要件書の3種 + 追加3種）
+
+| # | トレーニング名 | 実装方法 |
+| --- | --- | --- |
+| 1 | 遠近ピント切替 | `AnimationController` + `Tween<double>` で文字サイズを交互アニメーション |
+| 2 | 追従運動 | `CustomPainter` + `Offset.lerp()` でボールをランダム移動 |
+| 3 | ぼかし→くっきり | `ImageFilter.blur` の sigma を `16.0 → 0.0` でアニメーション |
+| 4 | 輻輳運動 | 2点が離れた位置から中心へ収束するアニメーション |
+| 5 | 視点移動（サッカード） | 対角コーナーを交互にターゲット表示 |
+| 6 | コントラスト順応 | 白背景上でグレー文字の opacity を徐々に上げる |
+
+#### サービス層
+
+- `HiveService` — sessions・settings の2ボックス管理、ストリーク計算、月間カレンダーデータ取得
+- `NotificationService` — 毎日リマインダー（デフォルト20:00）+ 未実施時の2時間後再通知
+- `AppTheme` — Primary `#1A6B4A`（ダークグリーン）、Accent `#FF6B35`（オレンジ）、高コントラスト設計
+
+### Phase 3: 画面実装（完了）
+
+| ファイル | 内容 |
+| --- | --- |
+| `home_screen.dart` | ストリーク表示・「今日やる」大ボタン |
+| `training_list_screen.dart` | 6種類のカード選択UI |
+| `training_session_screen.dart` | 60fps アニメーション・停止/再開 |
+| `training_complete_screen.dart` | 完了演出・励ましメッセージ・バッジ表示 |
+| `history_screen.dart` | 月間カレンダー・累計トレーニング時間 |
+| `settings_screen.dart` | 通知時刻設定 |
+| `app.dart` | go_router ルーティング設定 |
+
+### Phase 4: 追加対応（完了）
+
+- 距離アラートダイアログ（初回のみ表示、「次回から表示しない」をHiveに保存）
+- 7日連続達成バッジ
+- iOS 通知パーミッション対応
+
+------------------------------------------------------------------------
+
+## 13. ディレクトリ構成
+
+```text
+Focus Gym/
+├── CLAUDE.md
+├── requirements.md
+├── business_plan.md
+├── decisions.md
+└── focus_gym/             ← Flutterプロジェクト
+    ├── pubspec.yaml
+    └── lib/
+        ├── main.dart
+        ├── app/app.dart
+        ├── core/
+        │   ├── database/hive_service.dart
+        │   ├── models/training_session.dart
+        │   ├── models/training_session.g.dart  (自動生成)
+        │   └── notification/notification_service.dart
+        ├── features/
+        │   ├── home/home_screen.dart
+        │   ├── training/
+        │   │   ├── training_list_screen.dart
+        │   │   ├── training_session_screen.dart
+        │   │   └── training_complete_screen.dart
+        │   ├── history/history_screen.dart
+        │   └── settings/settings_screen.dart
+        └── shared/theme/app_theme.dart
+```
 
 ------------------------------------------------------------------------
 
