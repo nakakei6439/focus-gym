@@ -197,6 +197,8 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
         return '視点を素早く移してください';
       case TrainingType.contrastAdapt:
         return '薄い文字を読んでください';
+      case TrainingType.gaborPatch:
+        return '縞模様の向きを判定してください';
     }
   }
 
@@ -295,6 +297,9 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
         return _SaccadeTraining(controller: _trainingController);
       case TrainingType.contrastAdapt:
         return _ContrastAdaptTraining(controller: _trainingController, phrase: _contrastPhrase);
+      case TrainingType.gaborPatch:
+        // ガルボーパッチは専用画面で処理するため、ここには到達しない
+        return const SizedBox.shrink();
     }
   }
 
@@ -725,7 +730,7 @@ class _SaccadePainter extends CustomPainter {
 
 // ⑥ コントラスト順応トレーニング
 // 薄いテキストが徐々に濃くなる。背景は白系。
-// エビデンス: Polat et al. (2012, PLOS ONE) - コントラスト感度訓練で老眼改善
+// エビデンス: Owsley et al. (2000, IOVS) - コントラスト感度をサポートする可能性
 class _ContrastAdaptTraining extends StatelessWidget {
   final AnimationController controller;
   final String phrase;

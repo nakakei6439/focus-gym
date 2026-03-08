@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/database/hive_service.dart';
 import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/training/gabor_patch_screen.dart';
 import '../features/training/training_complete_screen.dart';
 import '../features/training/training_list_screen.dart';
 import '../features/training/training_session_screen.dart';
@@ -24,7 +24,8 @@ class _FocusGymAppState extends State<FocusGymApp> {
   @override
   void initState() {
     super.initState();
-    _initFuture = HiveService.openBoxes();
+    // main.dart で openBoxes() 済みのため即完了
+    _initFuture = Future.value();
   }
 
   @override
@@ -70,6 +71,7 @@ final _router = GoRouter(
       ],
     ),
     GoRoute(path: '/training', builder: (context, state) => const TrainingListScreen()),
+    GoRoute(path: '/training/gabor', builder: (context, state) => const GaborPatchScreen()),
     GoRoute(
       path: '/training/:type',
       builder: (context, state) {

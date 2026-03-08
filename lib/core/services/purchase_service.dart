@@ -1,0 +1,98 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
+import '../database/hive_service.dart';
+
+/// 買い切り課金管理サービス
+/// 商品ID: com.focusgym.unlock_all（300円・Non-Consumable）
+/// 初回起動から14日間は無料トライアル。以降は購入が必要。
+class PurchaseService {
+  static const String kProductId = 'com.focusgym.unlock_all';
+  static const int trialDays = 14;
+
+  static PurchaseService? _instance;
+  static PurchaseService get instance => _instance ??= PurchaseService._();
+  PurchaseService._();
+
+  final InAppPurchase _iap = InAppPurchase.instance;
+  StreamSubscription<List<PurchaseDetails>>? _subscription;
+
+  /// 購入済みか
+  bool get isPurchased =>
+      HiveService.instance.getSetting(HiveService.keyIsPurchased, defaultValue: false) as bool;
+
+  /// トライアル期間中か
+  bool get isInTrial {
+    final startStr = HiveService.instance.getSetting(HiveService.keyTrialStartDate, defaultValue: '') as String;
+    if (startStr.isEmpty) return true; // 未記録の場合はトライアル扱い
+    final start = DateTime.tryParse(startStr);
+    if (start == null) return true;
+    return DateTime.now().difference(start).inDays < trialDays;
+  }
+
+  /// トライアル残り日数
+  int get trialRemainingDays {
+    final startStr = HiveService.instance.getSetting(HiveService.keyTrialStartDate, defaultValue: '') as String;
+    if (startStr.isEmpty) return trialDays;
+    final start = DateTime.tryParse(startStr);
+    if (start == null) return trialDays;
+    final elapsed = DateTime.now().difference(start).inDays;
+    return (trialDays - elapsed).clamp(0, trialDays);
+  }
+
+  /// すべての機能が使えるか（購入済み OR トライアル中）
+  bool get isUnlocked => isPurchased || isInTrial;
+
+  /// 初回起動日を記録（main.dart の初期化時に呼ぶ）
+  Future<void> recordTrialStartIfNeeded() async {
+    final existing = HiveService.instance.getSetting(HiveService.keyTrialStartDate, defaultValue: '') as String;
+    if (existing.isEmpty) {
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      await HiveService.instance.saveSetting(HiveService.keyTrialStartDate, today);
+    }
+  }
+
+  /// 購入ストリームを開始（main.dart で呼ぶ）
+  void initialize() {
+    _subscription = _iap.purchaseStream.listen(
+      _onPurchaseUpdated,
+      onError: (e) => debugPrint('PurchaseService error: $e'),
+    );
+  }
+
+  void dispose() {
+    _subscription?.cancel();
+  }
+
+  /// 300円買い切り購入
+  Future<bool> purchase() async {
+    final available = await _iap.isAvailable();
+    if (!available) return false;
+
+    final response = await _iap.queryProductDetails({kProductId});
+    if (response.productDetails.isEmpty) return false;
+
+    final param = PurchaseParam(productDetails: response.productDetails.first);
+    return _iap.buyNonConsumable(purchaseParam: param);
+  }
+
+  /// 購入の復元
+  Future<void> restorePurchases() async {
+    await _iap.restorePurchases();
+  }
+
+  void _onPurchaseUpdated(List<PurchaseDetails> purchases) async {
+    for (final purchase in purchases) {
+      if (purchase.productID != kProductId) continue;
+      if (purchase.status == PurchaseStatus.purchased ||
+          purchase.status == PurchaseStatus.restored) {
+        await HiveService.instance.saveSetting(HiveService.keyIsPurchased, true);
+        if (purchase.pendingCompletePurchase) {
+          await _iap.completePurchase(purchase);
+        }
+      } else if (purchase.status == PurchaseStatus.error) {
+        debugPrint('Purchase error: ${purchase.error}');
+      }
+    }
+  }
+}

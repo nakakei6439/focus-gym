@@ -68,6 +68,8 @@ class TrainingTypeAdapter extends TypeAdapter<TrainingType> {
         return TrainingType.saccade;
       case 5:
         return TrainingType.contrastAdapt;
+      case 6:
+        return TrainingType.gaborPatch;
       default:
         return TrainingType.nearFar;
     }
@@ -93,6 +95,9 @@ class TrainingTypeAdapter extends TypeAdapter<TrainingType> {
         break;
       case TrainingType.contrastAdapt:
         writer.writeByte(5);
+        break;
+      case TrainingType.gaborPatch:
+        writer.writeByte(6);
         break;
     }
   }
