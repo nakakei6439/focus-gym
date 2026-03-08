@@ -5,6 +5,7 @@
 - 回答は必ず日本語
 - セッション末に重要な決定を `decisions.md` へ追記する（セミオート：Claude が自発的に実施）
 - 手動で記録したい場合は `/decisions` コマンドを使う
+- 新しいコマンドを `.claude/commands/` に作成したら `COMMANDS.md` にも追記する
 
 ---
 

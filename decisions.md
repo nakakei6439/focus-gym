@@ -103,3 +103,14 @@
 - Claude は CLAUDE.md の参照指示に従って必要時に各ファイルを読む
 
 ---
+
+## 2026-03-08 — アプリ名を FocusGym に統一
+
+### sweet eyes へのリブランディングを撤回
+
+**理由：**
+
+- リブランディング（sweet eyes）は一時的に検討したが、アプリ名は FocusGym に統一することを決定
+- business_plan.md の "sweet eyes" 表記をすべて "FocusGym" に更新
+
+---
