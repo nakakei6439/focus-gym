@@ -36,5 +36,5 @@ focusgym_app/android/app/debug
 focusgym_app/android/app/profile
 focusgym_app/android/app/release
 
-# Build artifacts at root (moved from focus_gym/)
+# Build artifacts
 build/
