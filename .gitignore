@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Claude IDE
+.claude/
+
+# Flutter/Dart
+focus_gym/.dart_tool/
+focus_gym/.flutter-plugins-dependencies
+focus_gym/.pub-cache/
+focus_gym/.pub/
+focus_gym/build/
+focus_gym/coverage/
+focus_gym/**/*.class
+focus_gym/**/*.log
+focus_gym/**/*.pyc
+focus_gym/**/*.swp
+focus_gym/.atom/
+focus_gym/.build/
+focus_gym/.buildlog/
+focus_gym/.history
+focus_gym/.svn/
+focus_gym/.swiftpm/
+focus_gym/migrate_working_dir/
+focus_gym/**/*.iml
+focus_gym/**/*.ipr
+focus_gym/**/*.iws
+focus_gym/.idea/
+focus_gym/**/doc/api/
+focus_gym/**/ios/Flutter/.last_build_id
+focus_gym/app.*.symbols
+focus_gym/app.*.map.json
+focus_gym/android/app/debug
+focus_gym/android/app/profile
+focus_gym/android/app/release
