@@ -175,3 +175,23 @@
 - URL：`https://nakakei6439.github.io/focus-gym/`
 
 ---
+
+## 2026-03-09 — iOS ワイヤレスデバッグ環境の確立
+
+### Xcode 16 対応のワイヤレスデバッグ手順を確立
+
+**理由・背景：**
+
+- Xcode 16 では「Window > Devices and Simulators」の右クリックメニューから「Connect via network」が廃止された
+- 代替として `xcrun devicectl manage pair --device <UDID>` コマンドでネットワークペアリングを行う
+- `flutter clean` 後は `ios/` ディレクトリ内で `pod install` を実行する必要がある（プロジェクトルートでは Podfile が見つからずエラーになる）
+- AP分離（クライアント分離）が有効なルーター環境では接続が失敗する場合がある
+
+**確立した手順：**
+
+1. `flutter clean && flutter pub get`
+2. `cd ios && pod install`
+3. `xcrun devicectl manage pair --device 00008150-000854443E03401C`（USB接続中に実行）
+4. USB を抜いて `flutter run -d 00008150-000854443E03401C` でワイヤレス起動
+
+---
