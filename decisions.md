@@ -195,3 +195,36 @@
 4. USB を抜いて `flutter run -d 00008150-000854443E03401C` でワイヤレス起動
 
 ---
+
+## 2026-03-12 — focus_gym_dev_plan.md をリポジトリに正式追加
+
+### 開発方針・進行計画ドキュメントをリポジトリで管理することを決定
+
+**理由：**
+
+- 課金モデル・トレーニング仕様・App Store チェックリスト・ブランチ一覧など、実装に必要な方針が分散していた
+- `focus_gym_dev_plan.md` をリポジトリに追加し、セッションをまたいでも参照できるようにした
+- `requirements.md`（技術仕様）と `decisions.md`（意思決定ログ）を補完する役割
+
+---
+
+## 2026-03-12 — ブランチ戦略の見直し・小さく分割して管理する方針
+
+### feature/gamification-ux を残しつつ、main から小さいブランチを切り直す
+
+**理由：**
+
+- `feature/gamification-ux` に変更が集中しすぎた（2コミットで41ファイル、1000行超）
+- 変更が大きすぎてレビュー・管理が困難になったため、1機能＝1PRの方針に切り替え
+- 既存の `feature/gamification-ux` は参照用として残し、削除しない
+
+**分割方針：**
+
+| ブランチ | 内容 |
+| --- | --- |
+| `fix/training-partial-save` | 中断時の経過時間保存・今日の残り時間バグ修正（作成済み） |
+| `feat/greeting-service` | 挨拶サービス |
+| `feat/app-icon` | アプリアイコン更新 |
+| `feat/gamification-ui` | training_session_screen.dart のUI刷新 |
+
+---

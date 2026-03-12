@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/database/hive_service.dart';
-import '../../core/services/daily_limit_service.dart';
 import '../../core/services/purchase_service.dart';
 import '../../shared/theme/app_theme.dart';
 
@@ -15,7 +14,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _db = HiveService.instance;
-  final _limit = DailyLimitService.instance;
   final _purchase = PurchaseService.instance;
 
   int get _streakDays => _db.getStreakDays();
@@ -59,16 +57,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: Theme.of(context).textTheme.headlineLarge),
               const SizedBox(height: 20),
               _StreakCard(streakDays: _streakDays),
-              const SizedBox(height: 16),
-              _DailyLimitCard(limit: _limit),
               if (_purchase.isInTrial && !_purchase.isPurchased) ...[
+                const SizedBox(height: 16),
                 const SizedBox(height: 12),
                 _TrialCard(remainingDays: _purchase.trialRemainingDays),
               ],
               const SizedBox(height: 20),
-              if (_limit.isLimitReached)
-                _LimitReachedCard()
-              else if (_doneToday)
+              if (_doneToday)
                 _DoneCard()
               else
                 _StartButton(onTap: () => context.push('/training')),
@@ -146,61 +141,6 @@ class _StreakCard extends StatelessWidget {
                         ?.copyWith(color: Colors.white70)),
               ],
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DailyLimitCard extends StatelessWidget {
-  final DailyLimitService limit;
-  const _DailyLimitCard({required this.limit});
-
-  @override
-  Widget build(BuildContext context) {
-    final remaining = limit.remainingSeconds;
-    final total = DailyLimitService.maxDailySeconds;
-    final progress = 1.0 - (remaining / total);
-    final color = limit.isWarning
-        ? Colors.orange
-        : limit.isLimitReached
-            ? Colors.red.shade300
-            : AppTheme.primary;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surface),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('今日の残り時間',
-                  style: Theme.of(context).textTheme.bodySmall),
-              Text(
-                limit.isLimitReached ? '終了' : limit.remainingLabel,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: AppTheme.surface,
-              valueColor: AlwaysStoppedAnimation(color),
-              minHeight: 6,
-            ),
-          ),
         ],
       ),
     );
@@ -293,39 +233,6 @@ class _DoneCard extends StatelessWidget {
                   ?.copyWith(color: AppTheme.primary)),
           const SizedBox(height: 4),
           Text('また明日も一緒に続けよう',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppTheme.textSecondary)),
-        ],
-      ),
-    );
-  }
-}
-
-class _LimitReachedCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.orange.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        children: [
-          const Text('🌿', style: TextStyle(fontSize: 40)),
-          const SizedBox(height: 8),
-          Text('今日のトレーニングは終了です',
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(color: Colors.orange.shade700)),
-          const SizedBox(height: 4),
-          Text('目を休めることも大切なケアです。また明日！',
-              textAlign: TextAlign.center,
               style: Theme.of(context)
                   .textTheme
                   .bodyMedium
