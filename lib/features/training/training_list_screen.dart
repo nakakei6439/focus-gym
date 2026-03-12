@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/models/training_session.dart';
-import '../../core/services/daily_limit_service.dart';
 import '../../core/services/purchase_service.dart';
 import '../../shared/theme/app_theme.dart';
 
@@ -15,7 +14,6 @@ class TrainingListScreen extends StatefulWidget {
 
 class _TrainingListScreenState extends State<TrainingListScreen> {
   final _purchase = PurchaseService.instance;
-  final _limit = DailyLimitService.instance;
 
   /// トレーニングが使えるか
   /// 無料トレーニング OR 購入済み OR トライアル中
@@ -24,8 +22,6 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLimitReached = _limit.isLimitReached;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('トレーニングを選ぶ'),
@@ -46,12 +42,10 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
             const SizedBox(height: 12),
             if (_purchase.isInTrial && !_purchase.isPurchased)
               _TrialBanner(remainingDays: _purchase.trialRemainingDays),
-            if (isLimitReached) _LimitBanner(),
             const SizedBox(height: 16),
             ...TrainingType.values.map((type) => _TrainingCard(
                   type: type,
                   isUnlocked: _isTrainingUnlocked(type),
-                  isLimitReached: isLimitReached,
                   onPurchase: _showPurchaseDialog,
                   onInfo: () => _showEvidence(context, type),
                 )),
@@ -149,44 +143,15 @@ class _TrialBanner extends StatelessWidget {
   }
 }
 
-class _LimitBanner extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.orange.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.timer_off_rounded, color: Colors.orange, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              '今日のトレーニングは終了です。目を休めることも大切なケアです。',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _TrainingCard extends StatelessWidget {
   final TrainingType type;
   final bool isUnlocked;
-  final bool isLimitReached;
   final VoidCallback onPurchase;
   final VoidCallback onInfo;
 
   const _TrainingCard({
     required this.type,
     required this.isUnlocked,
-    required this.isLimitReached,
     required this.onPurchase,
     required this.onInfo,
   });
@@ -202,9 +167,7 @@ class _TrainingCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           onTap: _isLocked
               ? onPurchase
-              : isLimitReached
-                  ? null
-                  : () => _startTraining(context),
+              : () => _startTraining(context),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Row(
