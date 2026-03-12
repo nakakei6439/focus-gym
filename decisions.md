@@ -195,3 +195,24 @@
 4. USB を抜いて `flutter run -d 00008150-000854443E03401C` でワイヤレス起動
 
 ---
+
+## 2026-03-12 — ブランチ戦略の見直し・小さく分割して管理する方針
+
+### feature/gamification-ux を残しつつ、main から小さいブランチを切り直す
+
+**理由：**
+
+- `feature/gamification-ux` に変更が集中しすぎた（2コミットで41ファイル、1000行超）
+- 変更が大きすぎてレビュー・管理が困難になったため、1機能＝1PRの方針に切り替え
+- 既存の `feature/gamification-ux` は参照用として残し、削除しない
+
+**分割方針：**
+
+| ブランチ | 内容 |
+| --- | --- |
+| `fix/training-partial-save` | 中断時の経過時間保存・今日の残り時間バグ修正（作成済み） |
+| `feat/greeting-service` | 挨拶サービス |
+| `feat/app-icon` | アプリアイコン更新 |
+| `feat/gamification-ui` | training_session_screen.dart のUI刷新 |
+
+---
