@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/database/hive_service.dart';
+import '../../core/services/daily_limit_service.dart';
 import '../../core/services/purchase_service.dart';
 import '../../shared/theme/app_theme.dart';
 
@@ -14,7 +15,29 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _db = HiveService.instance;
+  final _limit = DailyLimitService.instance;
   final _purchase = PurchaseService.instance;
+
+  GoRouter? _routerRef;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // ルート変更を検知してホーム画面を再描画する
+    _routerRef?.routerDelegate.removeListener(_onRouteChanged);
+    _routerRef = GoRouter.of(context);
+    _routerRef!.routerDelegate.addListener(_onRouteChanged);
+  }
+
+  void _onRouteChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _routerRef?.routerDelegate.removeListener(_onRouteChanged);
+    super.dispose();
+  }
 
   int get _streakDays => _db.getStreakDays();
   bool get _doneToday => _db.hasCompletedToday();
@@ -57,6 +80,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: Theme.of(context).textTheme.headlineLarge),
               const SizedBox(height: 20),
               _StreakCard(streakDays: _streakDays),
+              const SizedBox(height: 12),
+              _DailyLimitBar(limit: _limit),
               if (_purchase.isInTrial && !_purchase.isPurchased) ...[
                 const SizedBox(height: 16),
                 const SizedBox(height: 12),
@@ -143,6 +168,50 @@ class _StreakCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _DailyLimitBar extends StatelessWidget {
+  final DailyLimitService limit;
+  const _DailyLimitBar({required this.limit});
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = limit.remainingSeconds;
+    final total = DailyLimitService.maxDailySeconds;
+    final progress = 1.0 - (remaining / total);
+    final color = limit.isLimitReached
+        ? Colors.red.shade300
+        : limit.isWarning
+            ? Colors.orange
+            : AppTheme.primary;
+    final m = remaining ~/ 60;
+    final s = remaining % 60;
+    final label = limit.isLimitReached
+        ? '今日の上限に達しました'
+        : '今日の残り: ${m}分${s.toString().padLeft(2, '0')}秒';
+
+    return Row(
+      children: [
+        Text(label,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: color, fontWeight: FontWeight.w500)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: AppTheme.surface,
+              valueColor: AlwaysStoppedAnimation(color),
+              minHeight: 6,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
