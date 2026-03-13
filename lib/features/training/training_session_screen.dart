@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/database/hive_service.dart';
 import '../../core/models/training_session.dart';
+import '../../core/services/daily_limit_service.dart';
 import '../../shared/theme/app_theme.dart';
 
 class TrainingSessionScreen extends StatefulWidget {
@@ -160,6 +161,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       completed: true,
     );
     await HiveService.instance.saveSession(session);
+    await DailyLimitService.instance.addSeconds(_totalSeconds);
 
     if (!mounted) return;
     final streakDays = HiveService.instance.getStreakDays();
@@ -349,23 +351,47 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   }
 
   void _showQuitDialog(BuildContext context) {
+    _countdownTimer?.cancel();
+    _trainingController.stop();
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('トレーニングを中断しますか？'),
-        content: const Text('進捗は保存されません。'),
+        content: const Text('経過時間は保存されます。'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('続ける')),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              context.go('/home');
+              _startCountdown();
+              _trainingController.repeat(reverse: true);
+            },
+            child: const Text('続ける'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _savePartialSession();
+              if (mounted) context.go('/home');
             },
             child: const Text('中断する', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _savePartialSession() async {
+    final elapsed = _totalSeconds - _remainingSeconds;
+    if (elapsed <= 0) return;
+    final session = TrainingSession(
+      date: DateTime.now(),
+      type: _type,
+      durationSeconds: elapsed,
+      completed: false,
+    );
+    await HiveService.instance.saveSession(session);
+    await DailyLimitService.instance.addSeconds(elapsed);
   }
 }
 
