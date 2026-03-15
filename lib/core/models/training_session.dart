@@ -30,6 +30,9 @@ extension TrainingTypeExtension on TrainingType {
   /// 無料で常に使えるか（nearFar のみ無料）
   bool get isFree => this == TrainingType.nearFar;
 
+  /// v1 リリースで使用可能か（nearFar のみ）
+  bool get isReleasedV1 => this == TrainingType.nearFar;
+
   String get displayName {
     switch (this) {
       case TrainingType.nearFar:

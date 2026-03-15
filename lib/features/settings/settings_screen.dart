@@ -138,66 +138,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
 
-            const SizedBox(height: 24),
-
-            // 課金・購入
-            Text('プレミアム機能',
-                style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 12),
-            Card(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: Icon(
-                      _purchase.isPurchased
-                          ? Icons.lock_open_rounded
-                          : Icons.lock_rounded,
-                      color: _purchase.isPurchased
-                          ? AppTheme.primary
-                          : AppTheme.textSecondary,
-                    ),
-                    title: Text(
-                      _purchase.isPurchased
-                          ? '全機能アンロック済み'
-                          : _purchase.isInTrial
-                              ? 'トライアル中（残り${_purchase.trialRemainingDays}日）'
-                              : '全機能をアンロック（300円）',
-                      style: const TextStyle(fontSize: 17),
-                    ),
-                    subtitle: _purchase.isPurchased
-                        ? const Text('すべてのトレーニングが使えます')
-                        : null,
-                    trailing: _purchase.isPurchased
-                        ? null
-                        : ElevatedButton(
-                            onPressed: () async {
-                              await _purchase.purchase();
-                              if (mounted) setState(() {});
-                            },
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size(0, 40),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16),
-                            ),
-                            child: const Text('購入'),
-                          ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.restore_rounded,
-                        color: AppTheme.textSecondary),
-                    title: const Text('購入を復元する',
-                        style: TextStyle(fontSize: 17)),
-                    subtitle: const Text('以前の購入を復元します'),
-                    onTap: _restorePurchases,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 20),
-                  ),
-                ],
-              ),
-            ),
 
             const SizedBox(height: 24),
 

@@ -37,15 +37,14 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
             Text('今日はどれをやる？',
                 style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 6),
-            Text('各トレーニングは3分間です',
+            Text('各トレーニングは1分間です',
                 style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 12),
-            if (_purchase.isInTrial && !_purchase.isPurchased)
-              _TrialBanner(remainingDays: _purchase.trialRemainingDays),
             const SizedBox(height: 16),
             ...TrainingType.values.map((type) => _TrainingCard(
                   type: type,
                   isUnlocked: _isTrainingUnlocked(type),
+                  isComingSoon: !type.isReleasedV1,
                   onPurchase: _showPurchaseDialog,
                   onInfo: () => _showEvidence(context, type),
                 )),
@@ -146,12 +145,14 @@ class _TrialBanner extends StatelessWidget {
 class _TrainingCard extends StatelessWidget {
   final TrainingType type;
   final bool isUnlocked;
+  final bool isComingSoon;
   final VoidCallback onPurchase;
   final VoidCallback onInfo;
 
   const _TrainingCard({
     required this.type,
     required this.isUnlocked,
+    required this.isComingSoon,
     required this.onPurchase,
     required this.onInfo,
   });
@@ -160,98 +161,111 @@ class _TrainingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Card(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: _isLocked
-              ? onPurchase
-              : () => _startTraining(context),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: _isLocked
-                        ? Colors.grey.withValues(alpha: 0.1)
-                        : AppTheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
+    return Opacity(
+      opacity: isComingSoon ? 0.5 : 1.0,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Card(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: isComingSoon
+                ? null
+                : (_isLocked ? onPurchase : () => _startTraining(context)),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: (isComingSoon || _isLocked)
+                          ? Colors.grey.withValues(alpha: 0.1)
+                          : AppTheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Center(
+                      child: Text(type.emoji,
+                          style: TextStyle(
+                              fontSize: 28,
+                              color: (isComingSoon || _isLocked)
+                                  ? Colors.grey
+                                  : null)),
+                    ),
                   ),
-                  child: Center(
-                    child: Text(type.emoji,
-                        style: TextStyle(
-                            fontSize: 28,
-                            color: _isLocked ? Colors.grey : null)),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              type.displayName,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.copyWith(
-                                      color: _isLocked ? Colors.grey : null),
-                            ),
-                          ),
-                          if (type.isFree)
-                            Container(
-                              margin: const EdgeInsets.only(left: 8),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary,
-                                borderRadius: BorderRadius.circular(8),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                type.displayName,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall
+                                    ?.copyWith(
+                                        color: (isComingSoon || _isLocked)
+                                            ? Colors.grey
+                                            : null),
                               ),
-                              child: const Text('無料',
-                                  style: TextStyle(
-                                      color: Colors.white, fontSize: 11)),
                             ),
-                        ],
+                            if (isComingSoon)
+                              Container(
+                                margin: const EdgeInsets.only(left: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text('近日公開',
+                                    style: TextStyle(
+                                        color: Colors.white, fontSize: 11)),
+                              )
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(type.description,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                    color: (isComingSoon || _isLocked)
+                                        ? Colors.grey
+                                        : null)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    children: [
+                      GestureDetector(
+                        onTap: isComingSoon ? null : onInfo,
+                        child: Icon(Icons.info_outline_rounded,
+                            size: 20,
+                            color: isComingSoon
+                                ? Colors.grey.withValues(alpha: 0.5)
+                                : AppTheme.primary.withValues(alpha: 0.7)),
                       ),
-                      const SizedBox(height: 4),
-                      Text(type.description,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                  color: _isLocked ? Colors.grey : null)),
+                      const SizedBox(height: 8),
+                      Icon(
+                        isComingSoon
+                            ? Icons.schedule_rounded
+                            : (_isLocked
+                                ? Icons.lock_rounded
+                                : Icons.arrow_forward_ios_rounded),
+                        size: 18,
+                        color: (isComingSoon || _isLocked)
+                            ? Colors.grey
+                            : AppTheme.textSecondary,
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  children: [
-                    GestureDetector(
-                      onTap: onInfo,
-                      child: Icon(Icons.info_outline_rounded,
-                          size: 20,
-                          color: AppTheme.primary.withValues(alpha: 0.7)),
-                    ),
-                    const SizedBox(height: 8),
-                    Icon(
-                      _isLocked
-                          ? Icons.lock_rounded
-                          : Icons.arrow_forward_ios_rounded,
-                      size: 18,
-                      color: _isLocked
-                          ? Colors.grey
-                          : AppTheme.textSecondary,
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

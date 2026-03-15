@@ -20,7 +20,7 @@ class TrainingSessionScreen extends StatefulWidget {
 
 class _TrainingSessionScreenState extends State<TrainingSessionScreen>
     with TickerProviderStateMixin {
-  static const int _totalSeconds = 180; // 3分
+  static const int _totalSeconds = 60; // 1分
 
   // ランダムテキストリスト（遠近ピント切替）
   static const List<String> _nearFarChars = [

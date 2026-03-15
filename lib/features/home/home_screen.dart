@@ -270,7 +270,7 @@ class _StartButton extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Text('3分で完了します',
+        Text('1分で完了します',
             style: Theme.of(context)
                 .textTheme
                 .bodySmall
