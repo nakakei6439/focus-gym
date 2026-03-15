@@ -208,6 +208,26 @@
 
 ---
 
+## 2026-03-16 — App Store Connect 申請設定
+
+### データ収集：「いいえ」を選択
+
+**理由：**
+
+- アナリティクス・広告SDKは一切使用していない
+- トレーニングデータはすべて端末ローカル（Hive）のみに保存
+- `in_app_purchase` によるApp Store通信はApple側の決済処理であり「データ収集」に該当しない
+
+### プライバシーポリシーURL
+
+- `https://nakakei6439.github.io/focus-gym/privacy.html`（既存のGitHub Pages）
+
+### 著作権表記
+
+- `© 2026 Keita Nakagawa` に決定（現在年・本名）
+
+---
+
 ## 2026-03-12 — ブランチ戦略の見直し・小さく分割して管理する方針
 
 ### feature/gamification-ux を残しつつ、main から小さいブランチを切り直す
