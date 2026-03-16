@@ -141,6 +141,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             const SizedBox(height: 24),
 
+            // 課金
+            Text('課金', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 12),
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    title: const Text('購入状態',
+                        style: TextStyle(fontSize: 17)),
+                    trailing: Text(
+                      _purchase.isPurchased ? '購入済み' : 'トライアル中',
+                      style: TextStyle(
+                        color: _purchase.isPurchased
+                            ? AppTheme.primary
+                            : AppTheme.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    title: const Text('購入を復元',
+                        style: TextStyle(fontSize: 17)),
+                    trailing: const Icon(Icons.restore_rounded,
+                        size: 20, color: AppTheme.textSecondary),
+                    onTap: _restorePurchases,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
             // アプリについて
             Text('アプリについて',
                 style: Theme.of(context).textTheme.headlineSmall),
