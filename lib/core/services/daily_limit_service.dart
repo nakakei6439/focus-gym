@@ -1,9 +1,9 @@
 import '../database/hive_service.dart';
 
-/// 1日15分のトレーニング上限管理
+/// 1日5分のトレーニング上限管理
 class DailyLimitService {
-  static const int maxDailySeconds = 15 * 60; // 900秒
-  static const int warningSeconds = 12 * 60;  // 720秒（警告タイミング）
+  static const int maxDailySeconds = 5 * 60; // 300秒
+  static const int warningSeconds = 4 * 60;  // 240秒（警告タイミング・残り1分以下）
 
   static DailyLimitService? _instance;
   static DailyLimitService get instance => _instance ??= DailyLimitService._();

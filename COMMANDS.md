@@ -40,3 +40,29 @@ Claude API の利用残高・使用量を確認する。
 ```text
 /usage
 ```
+
+---
+
+## `/sim`
+
+iOSシミュレーターを起動してアプリを実行する。
+
+- iPhone 17 Pro シミュレーターを起動し `flutter run` でアプリを起動
+- 起動後のキー操作（`r` Hot Reload / `R` Hot Restart / `q` 終了）を案内
+
+```text
+/sim
+```
+
+---
+
+## `/device`
+
+実機（iPhone 17 Pro Max）でアプリを実行する。
+
+- デバイスの接続状態を確認し `flutter run` でアプリを起動
+- 未接続の場合はUSB接続・ワイヤレスペアリングの手順を案内
+
+```text
+/device
+```

@@ -20,7 +20,7 @@ class TrainingSessionScreen extends StatefulWidget {
 
 class _TrainingSessionScreenState extends State<TrainingSessionScreen>
     with TickerProviderStateMixin {
-  static const int _totalSeconds = 180; // 3分
+  static const int _totalSeconds = 60; // 1分
 
   // ランダムテキストリスト（遠近ピント切替）
   static const List<String> _nearFarChars = [
@@ -258,7 +258,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(_type.emoji, style: const TextStyle(fontSize: 72)),
+            Icon(_type.icon, size: 72, color: Colors.white70),
             const SizedBox(height: 20),
             Text(
               _type.displayName,
@@ -830,14 +830,20 @@ class _DistanceAlertDialogState extends State<_DistanceAlertDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('📏 スマホを正しい位置で持とう'),
+      title: const Row(
+        children: [
+          Icon(Icons.straighten_rounded),
+          SizedBox(width: 8),
+          Text('スマホを正しい位置で持とう'),
+        ],
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _tip('👁', '目との距離：30〜40cm'),
-          _tip('💡', '明るい場所で行いましょう'),
-          _tip('📐', '画面を正面に向けて持つ'),
+          _tip(Icons.remove_red_eye_rounded, '目との距離：30〜40cm'),
+          _tip(Icons.lightbulb_outline_rounded, '明るい場所で行いましょう'),
+          _tip(Icons.stay_current_portrait_rounded, '画面を正面に向けて持つ'),
           const SizedBox(height: 16),
           const Divider(),
           CheckboxListTile(
@@ -862,12 +868,12 @@ class _DistanceAlertDialogState extends State<_DistanceAlertDialog> {
     );
   }
 
-  Widget _tip(String emoji, String text) {
+  Widget _tip(IconData icon, String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 18)),
+          Icon(icon, size: 18, color: AppTheme.textSecondary),
           const SizedBox(width: 8),
           Text(text, style: const TextStyle(fontSize: 14)),
         ],
