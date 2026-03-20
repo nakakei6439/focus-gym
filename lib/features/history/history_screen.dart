@@ -198,7 +198,7 @@ class _RecentSessionsList extends StatelessWidget {
         final date = s.date;
         final label = '${date.month}/${date.day} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
         return ListTile(
-          leading: Text(s.type.emoji, style: const TextStyle(fontSize: 24)),
+          leading: Icon(s.type.icon, size: 24, color: AppTheme.primary),
           title: Text(s.type.displayName, style: Theme.of(context).textTheme.bodyLarge),
           subtitle: Text(label, style: Theme.of(context).textTheme.bodySmall),
           trailing: const Icon(Icons.check_circle_rounded, color: AppTheme.primary),

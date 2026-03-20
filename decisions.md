@@ -248,3 +248,42 @@
 | `feat/gamification-ui` | training_session_screen.dart のUI刷新 |
 
 ---
+
+## 2026-03-20 — App Store リジェクト対応（Guideline 1.4.1）
+
+### 設定画面に「参考文献」セクションを追加
+
+**理由：**
+
+- Guideline 1.4.1（Safety - Physical Harm）で「医療情報に引用元がない」としてリジェクトされた
+- 審査デバイス：iPad Air 11-inch (M3)、バージョン 1.0
+- `evidenceDescription` に学術引用は記載済みだったが、ユーザーから見えにくい場所にあった
+- 設定 → アプリについて → 参考文献（本アイコン）をタップで7件の学術論文ダイアログを表示
+- PubMed URL リンク付き（書籍のみURLなし）
+
+---
+
+## 2026-03-20 — 絵文字を Material Icons に置き換え
+
+### iOS 26 シミュレーターで絵文字が「?」ボックスになる問題を修正
+
+**理由：**
+
+- iOS 26（beta）シミュレーターで絵文字が正しくレンダリングされない
+- `TrainingType.icon`（IconData）ゲッターを追加し、4画面で Material Icons に置き換え
+- 対象：training_list_screen、training_session_screen、history_screen、_DistanceAlertDialog
+
+---
+
+## 2026-03-20 — Flutter SDK のインストール
+
+### Flutter SDK を `~/development/flutter/` に手動インストール
+
+**理由：**
+
+- Homebrew・FVM 未インストールの環境で `flutter` コマンドが見つからなかった
+- 公式 ZIP（flutter_macos_arm64_3.29.2-stable）を直接ダウンロード・展開
+- `~/.zshrc` に PATH 追記（`export PATH="$HOME/development/flutter/bin:$PATH"`）
+- プロジェクトが Dart SDK `^3.11.0` を要求しているため flutter upgrade が必要（要対応）
+
+---

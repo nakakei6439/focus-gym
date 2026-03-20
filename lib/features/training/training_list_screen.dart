@@ -88,7 +88,7 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Text(type.emoji, style: const TextStyle(fontSize: 24)),
+            Icon(type.icon, size: 24),
             const SizedBox(width: 8),
             Flexible(child: Text(type.displayName)),
           ],
@@ -185,12 +185,11 @@ class _TrainingCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Center(
-                      child: Text(type.emoji,
-                          style: TextStyle(
-                              fontSize: 28,
-                              color: (isComingSoon || _isLocked)
-                                  ? Colors.grey
-                                  : null)),
+                      child: Icon(type.icon,
+                          size: 28,
+                          color: (isComingSoon || _isLocked)
+                              ? Colors.grey
+                              : AppTheme.primary),
                     ),
                   ),
                   const SizedBox(width: 16),
