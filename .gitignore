@@ -38,3 +38,17 @@ focusgym_app/android/app/release
 
 # Build artifacts
 build/
+
+# Flutter/Dart (root level)
+.dart_tool/
+.flutter-plugins-dependencies
+.flutter-plugins
+.pub-cache/
+.pub/
+
+# IDE
+.vscode/
+.idea/
+
+# Screenshots
+ForcusGymScreenshot/
