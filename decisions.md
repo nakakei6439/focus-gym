@@ -156,13 +156,14 @@
 
 ---
 
-### 1日15分の上限設定
+### 1日5分の上限設定（当初15分→5分に変更）
 
 **理由：**
 
-- 視覚トレーニング研究では1回5〜15分が推奨されており、過度は眼精疲労を招く可能性がある
-- エビデンスに基づいた安全設計として設定
+- 視覚トレーニング研究では1回5〜15分が推奨されており、控えめに5分を上限とした
+- エビデンスに基づいた安全設計として設定（4分でソフト警告、5分でロック）
 - ホーム画面にプログレスバーで残り時間を表示
+- `daily_limit_service.dart` にて `maxDailySeconds = 300`（5分）で実装済み
 
 ---
 
@@ -285,5 +286,17 @@
 - 公式 ZIP（flutter_macos_arm64_3.29.2-stable）を直接ダウンロード・展開
 - `~/.zshrc` に PATH 追記（`export PATH="$HOME/development/flutter/bin:$PATH"`）
 - プロジェクトが Dart SDK `^3.11.0` を要求しているため flutter upgrade が必要（要対応）
+
+---
+
+## 2026-03-20 — .gitignore の修正
+
+### ルートレベルのビルドファイル・IDE設定を .gitignore に追加
+
+**理由：**
+
+- `.gitignore` が `focusgym_app/` プレフィックスでのみ除外指定されており、プロジェクトルートにある `.dart_tool/`・`.flutter-plugins-dependencies`・`.vscode/`・`ForcusGymScreenshot/` が gitignore されていなかった
+- これらはコンパイルキャッシュ・IDE設定・スクリーンショットであり、バージョン管理対象外とすべきファイル
+- プレフィックスなしのパターンをルートの `.gitignore` に追加し、`main` へ直接コミット・push して解決
 
 ---
