@@ -33,7 +33,13 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
   }
 
   void _onPurchaseChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    if (_purchase.lastError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_purchase.lastError!)),
+      );
+    }
+    setState(() {});
   }
 
   @override
@@ -73,6 +79,7 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
   }
 
   void _showPurchaseDialog() {
+    if (_purchase.isPurchasing) return; // 購入処理中は二重起動を防ぐ
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

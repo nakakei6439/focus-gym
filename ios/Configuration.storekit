@@ -1,0 +1,30 @@
+{
+  "identifier" : "6E2A8B2E",
+  "nonConsumableProducts" : [
+    {
+      "displayPrice" : "300",
+      "familyShareable" : false,
+      "internalID" : "86F23D52",
+      "localizations" : [
+        {
+          "description" : "すべてのトレーニングを永久にアンロックします",
+          "displayName" : "全トレーニングアンロック",
+          "locale" : "ja_JP"
+        }
+      ],
+      "productID" : "com.focusgym.unlock_all",
+      "referenceName" : "Unlock All",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "ja_JP",
+    "_storefront" : "JPN",
+    "_timeRate" : 1
+  },
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

@@ -17,6 +17,12 @@ class PurchaseService extends ChangeNotifier {
   final InAppPurchase _iap = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _subscription;
 
+  bool _isPurchasing = false;
+  bool get isPurchasing => _isPurchasing;
+
+  String? _lastError;
+  String? get lastError => _lastError;
+
   /// 購入済みか
   bool get isPurchased =>
       HiveService.instance.getSetting(HiveService.keyIsPurchased, defaultValue: false) as bool;
@@ -24,7 +30,7 @@ class PurchaseService extends ChangeNotifier {
   /// トライアル期間中か
   bool get isInTrial {
     final startStr = HiveService.instance.getSetting(HiveService.keyTrialStartDate, defaultValue: '') as String;
-    if (startStr.isEmpty) return true; // 未記録の場合はトライアル扱い
+    if (startStr.isEmpty) return true;
     final start = DateTime.tryParse(startStr);
     if (start == null) return true;
     return DateTime.now().difference(start).inDays < trialDays;
@@ -56,7 +62,12 @@ class PurchaseService extends ChangeNotifier {
   void initialize() {
     _subscription = _iap.purchaseStream.listen(
       _onPurchaseUpdated,
-      onError: (e) => debugPrint('PurchaseService error: $e'),
+      onError: (e) {
+        debugPrint('PurchaseService error: $e');
+        _isPurchasing = false;
+        _lastError = '購入処理中にエラーが発生しました';
+        notifyListeners();
+      },
     );
   }
 
@@ -67,34 +78,69 @@ class PurchaseService extends ChangeNotifier {
   }
 
   /// 300円買い切り購入
-  Future<bool> purchase() async {
+  Future<void> purchase() async {
+    _isPurchasing = true;
+    _lastError = null;
+    notifyListeners();
+
     final available = await _iap.isAvailable();
-    if (!available) return false;
+    if (!available) {
+      _isPurchasing = false;
+      _lastError = 'ストアに接続できませんでした';
+      notifyListeners();
+      return;
+    }
 
     final response = await _iap.queryProductDetails({kProductId});
-    if (response.productDetails.isEmpty) return false;
+    if (response.productDetails.isEmpty) {
+      _isPurchasing = false;
+      _lastError = '商品情報を取得できませんでした';
+      notifyListeners();
+      return;
+    }
 
     final param = PurchaseParam(productDetails: response.productDetails.first);
-    return _iap.buyNonConsumable(purchaseParam: param);
+    _iap.buyNonConsumable(purchaseParam: param);
+    // 以降は _onPurchaseUpdated で処理
   }
 
   /// 購入の復元
   Future<void> restorePurchases() async {
+    _isPurchasing = true;
+    _lastError = null;
+    notifyListeners();
     await _iap.restorePurchases();
+    // 結果は _onPurchaseUpdated で処理される
+    // 何も復元されなかった場合のタイムアウト処理
+    await Future.delayed(const Duration(seconds: 3));
+    if (_isPurchasing) {
+      _isPurchasing = false;
+      notifyListeners();
+    }
   }
 
   void _onPurchaseUpdated(List<PurchaseDetails> purchases) async {
     for (final purchase in purchases) {
       if (purchase.productID != kProductId) continue;
+
       if (purchase.status == PurchaseStatus.purchased ||
           purchase.status == PurchaseStatus.restored) {
         await HiveService.instance.saveSetting(HiveService.keyIsPurchased, true);
+        _isPurchasing = false;
+        _lastError = null;
         notifyListeners();
         if (purchase.pendingCompletePurchase) {
           await _iap.completePurchase(purchase);
         }
+      } else if (purchase.status == PurchaseStatus.canceled) {
+        _isPurchasing = false;
+        _lastError = null;
+        notifyListeners();
       } else if (purchase.status == PurchaseStatus.error) {
         debugPrint('Purchase error: ${purchase.error}');
+        _isPurchasing = false;
+        _lastError = '購入に失敗しました。もう一度お試しください';
+        notifyListeners();
       }
     }
   }
