@@ -5,6 +5,7 @@ import '../../core/database/hive_service.dart';
 import '../../core/services/daily_limit_service.dart';
 import '../../core/services/purchase_service.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/widgets/references_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -323,13 +324,33 @@ class _InfoBanner extends StatelessWidget {
         border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              '本アプリは医療行為ではありません。眼の異常を感じた場合は医療機関へご相談ください。',
-              style: Theme.of(context).textTheme.bodySmall,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '本アプリは医療行為ではありません。眼の異常を感じた場合は医療機関へご相談ください。',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: () => showDialog(
+                    context: context,
+                    builder: (_) => const ReferencesDialog(),
+                  ),
+                  child: Text(
+                    '参考文献を見る →',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.blue,
+                          decoration: TextDecoration.underline,
+                        ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
