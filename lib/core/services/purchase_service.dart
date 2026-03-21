@@ -6,7 +6,7 @@ import '../database/hive_service.dart';
 /// 買い切り課金管理サービス
 /// 商品ID: com.focusgym.unlock_all（300円・Non-Consumable）
 /// 初回起動から14日間は無料トライアル。以降は購入が必要。
-class PurchaseService {
+class PurchaseService extends ChangeNotifier {
   static const String kProductId = 'com.focusgym.unlock_all';
   static const int trialDays = 14;
 
@@ -60,8 +60,10 @@ class PurchaseService {
     );
   }
 
+  @override
   void dispose() {
     _subscription?.cancel();
+    super.dispose();
   }
 
   /// 300円買い切り購入
@@ -87,6 +89,7 @@ class PurchaseService {
       if (purchase.status == PurchaseStatus.purchased ||
           purchase.status == PurchaseStatus.restored) {
         await HiveService.instance.saveSetting(HiveService.keyIsPurchased, true);
+        notifyListeners();
         if (purchase.pendingCompletePurchase) {
           await _iap.completePurchase(purchase);
         }

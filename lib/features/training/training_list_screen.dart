@@ -21,6 +21,22 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
       type.isFree || _purchase.isUnlocked;
 
   @override
+  void initState() {
+    super.initState();
+    _purchase.addListener(_onPurchaseChanged);
+  }
+
+  @override
+  void dispose() {
+    _purchase.removeListener(_onPurchaseChanged);
+    super.dispose();
+  }
+
+  void _onPurchaseChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -40,6 +56,8 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
             Text('各トレーニングは1分間です',
                 style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 12),
+            if (!_purchase.isPurchased && _purchase.isInTrial)
+              _TrialBanner(remainingDays: _purchase.trialRemainingDays),
             const SizedBox(height: 16),
             ...TrainingType.values.map((type) => _TrainingCard(
                   type: type,
@@ -72,7 +90,6 @@ class _TrainingListScreenState extends State<TrainingListScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               await PurchaseService.instance.purchase();
-              if (mounted) setState(() {});
             },
             child: const Text('300円で購入'),
           ),
