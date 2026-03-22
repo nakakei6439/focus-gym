@@ -26,7 +26,13 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   // 記号リスト（遠近ピント切替）
   static const List<String> _nearFarChars = ['●', '▲', '■', '◆', '★'];
 
-  static const _nearFarAnimDuration = Duration(milliseconds: 1000);
+  Duration get _nearFarAnimDuration {
+    const startMs = 2000.0;
+    const endMs = 600.0;
+    const decay = 0.95;
+    final ms = (endMs + (startMs - endMs) * pow(decay, _tapCount)).round();
+    return Duration(milliseconds: ms.clamp(endMs.toInt(), startMs.toInt()));
+  }
 
   // ランダムフレーズリスト（ぼかし→くっきり）
   static const List<String> _blurPhrases = [
@@ -59,6 +65,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
 
   final _random = Random();
   int _remainingSeconds = _totalSeconds;
+  int _tapCount = 0;
   bool _isPaused = false;
   bool _isStarted = false;
   bool _isSmall = true;
@@ -107,9 +114,6 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
           setState(() {
             _isAnimating = false;
             _isSmall = reachedSmall;
-            if (reachedSmall) {
-              _nearFarChar = _nearFarChars[_random.nextInt(_nearFarChars.length)];
-            }
           });
         })
         .catchError((_) {
@@ -149,7 +153,14 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
 
   void _onNearFarTap() {
     if (_isPaused || !_isStarted || _isAnimating) return;
+    if (_isSmall) {
+      final remaining = _nearFarChars.where((c) => c != _nearFarChar).toList();
+      setState(() {
+        _nearFarChar = remaining[_random.nextInt(remaining.length)];
+      });
+    }
     HapticFeedback.lightImpact();
+    _tapCount++;
     _runNearFarAnimation(_isSmall ? 1.0 : 0.0);
   }
 
