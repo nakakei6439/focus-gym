@@ -26,7 +26,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   // 記号リスト（遠近ピント切替）
   static const List<String> _nearFarChars = ['●', '▲', '■', '◆', '★'];
 
-  static const _nearFarAnimDuration = Duration(milliseconds: 1500);
+  static const _nearFarAnimDuration = Duration(milliseconds: 1000);
 
   // ランダムフレーズリスト（ぼかし→くっきり）
   static const List<String> _blurPhrases = [
