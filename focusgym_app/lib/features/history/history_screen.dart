@@ -66,9 +66,9 @@ class _StatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: _StatCard(label: '連続達成', value: '$streakDays日', icon: '🔥')),
+        Expanded(child: _StatCard(label: '連続達成', value: '$streakDays日', icon: Icons.local_fire_department)),
         const SizedBox(width: 12),
-        Expanded(child: _StatCard(label: '累計時間', value: totalTimeLabel, icon: '⏱️')),
+        Expanded(child: _StatCard(label: '累計時間', value: totalTimeLabel, icon: Icons.timer)),
       ],
     );
   }
@@ -77,7 +77,7 @@ class _StatsRow extends StatelessWidget {
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
-  final String icon;
+  final IconData icon;
   const _StatCard({required this.label, required this.value, required this.icon});
 
   @override
@@ -87,7 +87,7 @@ class _StatCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 28)),
+            Icon(icon, size: 28, color: AppTheme.primary),
             const SizedBox(height: 8),
             Text(value, style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: AppTheme.primary)),
             const SizedBox(height: 2),
@@ -198,7 +198,7 @@ class _RecentSessionsList extends StatelessWidget {
         final date = s.date;
         final label = '${date.month}/${date.day} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
         return ListTile(
-          leading: Text(s.type.emoji, style: const TextStyle(fontSize: 24)),
+          leading: Icon(s.type.icon, size: 24, color: AppTheme.primary),
           title: Text(s.type.displayName, style: Theme.of(context).textTheme.bodyLarge),
           subtitle: Text(label, style: Theme.of(context).textTheme.bodySmall),
           trailing: const Icon(Icons.check_circle_rounded, color: AppTheme.primary),

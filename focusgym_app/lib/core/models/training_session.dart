@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 
 part 'training_session.g.dart';
@@ -72,6 +73,23 @@ extension TrainingTypeExtension on TrainingType {
         return '⚡';
       case TrainingType.contrastAdapt:
         return '🌗';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case TrainingType.nearFar:
+        return Icons.zoom_in_map_rounded;
+      case TrainingType.tracking:
+        return Icons.remove_red_eye_rounded;
+      case TrainingType.blurClarity:
+        return Icons.blur_on_rounded;
+      case TrainingType.convergence:
+        return Icons.compare_arrows_rounded;
+      case TrainingType.saccade:
+        return Icons.speed_rounded;
+      case TrainingType.contrastAdapt:
+        return Icons.contrast_rounded;
     }
   }
 }

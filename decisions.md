@@ -289,6 +289,58 @@
 
 ---
 
+## 2026-03-22 — focusgym_app/lib/ のコード同期・バグ修正
+
+### lib/ vs focusgym_app/lib/ のパス分岐を発見・修正
+
+**背景：**
+
+- commit 1a54f38 でプロジェクトを `focus_gym/lib/` から `focusgym_app/lib/` に移動した
+- しかし以降のすべての実装コミット（PR #4・PR #5・ecb3478・acf4a11）は誤って旧 `lib/` に入り続けた
+- `focusgym_app/lib/` は移動直後のままで約3週間分の変更が未反映だった
+
+**修正内容：**
+
+- `focusgym_app/pubspec.yaml` に `url_launcher ^6.2.5`・`in_app_purchase ^3.1.11` を追加
+- `hive_service.dart` に `keyIsPurchased`・`keyTrialStartDate`・`keyDailyTrainingSeconds`・`keyLastTrainingDate` を追加
+- `purchase_service.dart`・`daily_limit_service.dart` を新規作成
+- `settings_screen.dart` を課金・サポート・参考文献対応版に差し替え
+- `references_dialog.dart` を `shared/widgets/` に追加
+
+---
+
+### iOS 26 シミュレーターでの絵文字「?」問題（focusgym_app/ 側）
+
+**理由：**
+
+- `focusgym_app/` 側の `history_screen.dart` はパス分岐のため旧版のままで、`_StatCard` の icon が String emoji（🔥・⏱️）だった
+- iOS 26（beta）シミュレーターで絵文字が「?」ボックスになる問題が再発
+- `IconData` を使う最新版に差し替えて解決
+
+---
+
+### ホーム画面の残り時間バー・トライアルカード・参考文献リンクを復元
+
+**理由：**
+
+- `focusgym_app/lib/features/home/home_screen.dart` が旧バージョンのままで、`DailyLimitService` 統合・`_DailyLimitBar`・`_TrialCard`・`_InfoBanner` の参考文献リンクが未実装だった
+- 最新版（`ecb3478` 相当）に差し替えて全ウィジェットを復元
+
+---
+
+### 「今日のトレーニング完了！」表示条件を修正
+
+**問題：**
+
+- 残り4分50秒あってもトレーニング後に「今日のトレーニング完了！」カードが表示されトレーニング不可になる
+
+**原因と修正：**
+
+- 条件が `hasCompletedToday()`（今日1セッションでも完了した場合）だったため
+- `_limit.isLimitReached`（累計5分に達した場合のみ）に変更
+
+---
+
 ## 2026-03-20 — .gitignore の修正
 
 ### ルートレベルのビルドファイル・IDE設定を .gitignore に追加
