@@ -438,7 +438,7 @@ class _NearFarTraining extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sizeAnim = Tween<double>(begin: 14, end: 80).animate(
+    final sizeAnim = Tween<double>(begin: 14, end: 100).animate(
       CurvedAnimation(parent: controller, curve: Curves.easeInOut),
     );
     final opacityAnim = Tween<double>(begin: 0.35, end: 1.0).animate(
@@ -457,7 +457,7 @@ class _NearFarTraining extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              isSmall ? '遠くを見てください →' : '← 近くを見てください',
+              '記号にピントを合わせて',
               style: const TextStyle(color: Colors.white54, fontSize: 14),
             ),
             const SizedBox(height: 48),
@@ -478,13 +478,24 @@ class _NearFarTraining extends StatelessWidget {
               },
             ),
             const SizedBox(height: 48),
-            AnimatedOpacity(
-              opacity: isAnimating ? 0.0 : 1.0,
-              duration: const Duration(milliseconds: 300),
-              child: const Text(
-                'タップしてください',
-                style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500),
-              ),
+            AnimatedBuilder(
+              animation: controller,
+              builder: (context, _) {
+                // 小→大（isSmall=true）: controller 0→1、75%以上で表示
+                // 大→小（isSmall=false）: controller 1→0、25%以下で表示
+                final nearCompletion = isSmall
+                    ? controller.value >= 0.75
+                    : controller.value <= 0.25;
+                final show = !isAnimating || nearCompletion;
+                return AnimatedOpacity(
+                  opacity: show ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 150),
+                  child: const Text(
+                    'タップしてください',
+                    style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                );
+              },
             ),
           ],
         ),
