@@ -12,12 +12,11 @@ FocusGym
 
 ### ■ コンセプト
 
-「1日3分、目のジム」
+「1日1分〜、目のジム」
 
 ### ■ 対象OS
 
--   iOS
--   Android
+-   iOS（Android は現時点で対象外）
 
 ------------------------------------------------------------------------
 
@@ -60,7 +59,7 @@ FocusGym
 
 -   小さい文字を2秒表示
 -   遠景風アニメーション表示へ切替
--   交互表示を3分間繰り返す
+-   交互表示を1分間繰り返す
 -   文字サイズ：3段階
 -   切替スピード：3段階
 -   実装方針：`AnimationController` + `Tween<double>` で文字サイズを交互にアニメーション
@@ -70,7 +69,7 @@ FocusGym
 -   画面上を動くオブジェクト（●）を目で追う
 -   上下左右ランダム移動
 -   速度：低・中・高
--   3分間実施
+-   1分間実施
 -   実装方針：`CustomPainter` + `AnimationController` で Canvas に ● を描画、`Tween<Offset>` でランダムな目標座標へアニメーション
 
 #### ③ ぼかし→くっきり刺激トレーニング
@@ -78,14 +77,14 @@ FocusGym
 -   ぼやけた文字を表示
 -   徐々に鮮明化するアニメーション
 -   ピント調整感覚を刺激
--   3分間実施
+-   1分間実施
 -   実装方針：`BackdropFilter` + `ImageFilter.blur` の sigma 値を `Tween<double>`（15.0 → 0.0）でアニメーション
 
 ------------------------------------------------------------------------
 
 ### 4.2 共通仕様
 
--   1セッション：3分固定
+-   1セッション：1分固定
 -   途中停止・再開可能
 -   音声ガイド ON/OFF
 -   終了後に達成画面表示
@@ -179,6 +178,8 @@ FocusGym
 | 通知機能 | flutter_local_notifications | Firebase不要・ソロMVP向け。将来的にFCMへ移行可 |
 | 画面遷移 | go_router 14.0.0 | 宣言的ルーティング |
 | カレンダーUI | table_calendar 3.1.0 | 履歴画面の月間カレンダー |
+| リンク起動 | url_launcher ^6.2.5 | サポートURL・プライバシーポリシー・PubMed リンク |
+| アプリ内課金 | in_app_purchase ^3.1.11 | Non-Consumable 買い切り（`com.focusgym.unlock_all`） |
 | コード生成 | build_runner | Hive TypeAdapter 自動生成 |
 | 状態管理 | setState / InheritedWidget | **Riverpod は使用しない** |
 | アーキテクチャ | Feature-first ディレクトリ構成 | — |
@@ -210,6 +211,8 @@ FocusGym
 
 - `HiveService` — sessions・settings の2ボックス管理、ストリーク計算、月間カレンダーデータ取得
 - `NotificationService` — 毎日リマインダー（デフォルト20:00）+ 未実施時の2時間後再通知
+- `PurchaseService` — `ChangeNotifier` で購入状態を管理。14日間トライアル・Non-Consumable 買い切り・復元
+- `DailyLimitService` — 1日5分上限管理（`maxDailySeconds=300`）、残り時間・警告ゾーン・翌日リセット
 - `AppTheme` — Primary `#1A6B4A`（ダークグリーン）、Accent `#FF6B35`（オレンジ）、高コントラスト設計
 
 ### Phase 3: 画面実装（完了）
@@ -221,7 +224,7 @@ FocusGym
 | `training_session_screen.dart` | 60fps アニメーション・停止/再開 |
 | `training_complete_screen.dart` | 完了演出・励ましメッセージ・バッジ表示 |
 | `history_screen.dart` | 月間カレンダー・累計トレーニング時間 |
-| `settings_screen.dart` | 通知時刻設定 |
+| `settings_screen.dart` | 課金状態表示・購入を復元・サポートURL・プライバシーポリシー・参考文献 |
 | `app.dart` | go_router ルーティング設定 |
 
 ### Phase 4: 追加対応（完了）
@@ -235,12 +238,12 @@ FocusGym
 ## 13. ディレクトリ構成
 
 ```text
-Focus Gym/
+FocusGym/
 ├── CLAUDE.md
 ├── requirements.md
 ├── business_plan.md
 ├── decisions.md
-└── focus_gym/             ← Flutterプロジェクト
+└── focusgym_app/             ← Flutterプロジェクト
     ├── pubspec.yaml
     └── lib/
         ├── main.dart
@@ -249,7 +252,10 @@ Focus Gym/
         │   ├── database/hive_service.dart
         │   ├── models/training_session.dart
         │   ├── models/training_session.g.dart  (自動生成)
-        │   └── notification/notification_service.dart
+        │   ├── notification/notification_service.dart
+        │   └── services/
+        │       ├── purchase_service.dart
+        │       └── daily_limit_service.dart
         ├── features/
         │   ├── home/home_screen.dart
         │   ├── training/
@@ -258,7 +264,9 @@ Focus Gym/
         │   │   └── training_complete_screen.dart
         │   ├── history/history_screen.dart
         │   └── settings/settings_screen.dart
-        └── shared/theme/app_theme.dart
+        └── shared/
+            ├── theme/app_theme.dart
+            └── widgets/references_dialog.dart
 ```
 
 ------------------------------------------------------------------------

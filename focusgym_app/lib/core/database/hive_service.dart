@@ -7,6 +7,10 @@ class HiveService {
 
   static const String keyDistanceAlertDisabled = 'distanceAlertDisabled';
   static const String keyDistanceAlertSkippedDate = 'distanceAlertSkippedDate';
+  static const String keyIsPurchased = 'isPurchased';
+  static const String keyTrialStartDate = 'trialStartDate';
+  static const String keyDailyTrainingSeconds = 'dailyTrainingSeconds';
+  static const String keyLastTrainingDate = 'lastTrainingDate';
 
   static HiveService? _instance;
   static HiveService get instance => _instance ??= HiveService._();

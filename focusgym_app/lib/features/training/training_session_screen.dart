@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/database/hive_service.dart';
@@ -19,20 +20,17 @@ class TrainingSessionScreen extends StatefulWidget {
 
 class _TrainingSessionScreenState extends State<TrainingSessionScreen>
     with TickerProviderStateMixin {
-  static const int _totalSeconds = 180; // 3分
+  static const int _totalSeconds = 60; // 1分
 
-  // ランダムテキストリスト（遠近ピント切替）
-  static const List<String> _nearFarChars = [
-    'あ', 'い', 'う', 'え', 'お',
-    '愛', '山', '川', '木', '日', '花', '空', '海', '心', '光',
-    '１', '２', '３', '８', '０',
-    'A', 'E', 'F', 'R', 'S',
-  ];
+  // 記号リスト（遠近ピント切替）
+  static const List<String> _nearFarChars = ['●', '▲', '■', '◆', '★'];
+
+  static const _nearFarAnimDuration = Duration(milliseconds: 1500);
 
   // ランダムフレーズリスト（ぼかし→くっきり）
   static const List<String> _blurPhrases = [
     '老眼トレーニング\nFocusGym',
-    '毎日3分間\n目の体操',
+    '毎日1分間\n目の体操',
     '近くと遠くを\n交互に見る',
     '目の筋肉を\nほぐしましょう',
     '視力を守ろう\n今日も続けて',
@@ -62,6 +60,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   int _remainingSeconds = _totalSeconds;
   bool _isPaused = false;
   bool _isStarted = false;
+  bool _isTargetingNear = false;
   Timer? _countdownTimer;
 
   @override
@@ -109,10 +108,31 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   }
 
   void _startTraining() {
-    setState(() => _isStarted = true);
-    _trainingController.repeat(reverse: true);
+    setState(() {
+      _isStarted = true;
+      _isTargetingNear = false;
+    });
+    if (_type == TrainingType.nearFar) {
+      _trainingController.animateTo(0.0, duration: _nearFarAnimDuration, curve: Curves.easeInOut);
+    } else {
+      _trainingController.repeat(reverse: true);
+    }
     _timerController.forward();
     _startCountdown();
+  }
+
+  void _onNearFarTap() {
+    if (_isPaused || !_isStarted) return;
+    setState(() {
+      _isTargetingNear = !_isTargetingNear;
+      _nearFarChar = _nearFarChars[_random.nextInt(_nearFarChars.length)];
+    });
+    HapticFeedback.lightImpact();
+    _trainingController.animateTo(
+      _isTargetingNear ? 1.0 : 0.0,
+      duration: _nearFarAnimDuration,
+      curve: Curves.easeInOut,
+    );
   }
 
   void _showDistanceAlert() {
@@ -147,6 +167,12 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
     setState(() => _isPaused = !_isPaused);
     if (_isPaused) {
       _trainingController.stop();
+    } else if (_type == TrainingType.nearFar) {
+      _trainingController.animateTo(
+        _isTargetingNear ? 1.0 : 0.0,
+        duration: _nearFarAnimDuration,
+        curve: Curves.easeInOut,
+      );
     } else {
       _trainingController.repeat(reverse: true);
     }
@@ -186,7 +212,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   String get _instructionText {
     switch (_type) {
       case TrainingType.nearFar:
-        return '文字にピントを合わせてください';
+        return 'ピントが合ったらタップ';
       case TrainingType.tracking:
         return '目で追ってください';
       case TrainingType.blurClarity:
@@ -284,7 +310,12 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   Widget _buildTrainingArea() {
     switch (_type) {
       case TrainingType.nearFar:
-        return _NearFarTraining(controller: _trainingController, character: _nearFarChar);
+        return _NearFarTraining(
+          controller: _trainingController,
+          character: _nearFarChar,
+          onTap: _onNearFarTap,
+          isTargetingNear: _isTargetingNear,
+        );
       case TrainingType.tracking:
         return _TrackingTraining(controller: _trainingController);
       case TrainingType.blurClarity:
@@ -368,51 +399,64 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
 class _NearFarTraining extends StatelessWidget {
   final AnimationController controller;
   final String character;
-  const _NearFarTraining({required this.controller, required this.character});
+  final VoidCallback onTap;
+  final bool isTargetingNear;
+
+  const _NearFarTraining({
+    required this.controller,
+    required this.character,
+    required this.onTap,
+    required this.isTargetingNear,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final sizeAnim = Tween<double>(begin: 14, end: 60).animate(
+    final sizeAnim = Tween<double>(begin: 14, end: 80).animate(
       CurvedAnimation(parent: controller, curve: Curves.easeInOut),
     );
-    final opacityAnim = Tween<double>(begin: 0.4, end: 1.0).animate(
+    final opacityAnim = Tween<double>(begin: 0.35, end: 1.0).animate(
       CurvedAnimation(parent: controller, curve: Curves.easeInOut),
     );
+    final colorAnim = ColorTween(
+      begin: const Color(0xFFAADDFF), // 遠くは青白く（大気遠近法）
+      end: Colors.white,              // 近くは純白
+    ).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut));
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text('文字にピントを合わせてください', style: TextStyle(color: Colors.white54, fontSize: 14)),
-          const SizedBox(height: 40),
-          AnimatedBuilder(
-            animation: controller,
-            builder: (context, _) {
-              return Opacity(
-                opacity: opacityAnim.value,
-                child: Text(
-                  character,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: sizeAnim.value,
-                    fontWeight: FontWeight.bold,
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              isTargetingNear ? '← 近くを見てください' : '遠くを見てください →',
+              style: const TextStyle(color: Colors.white54, fontSize: 14),
+            ),
+            const SizedBox(height: 48),
+            AnimatedBuilder(
+              animation: controller,
+              builder: (context, _) {
+                return Opacity(
+                  opacity: opacityAnim.value,
+                  child: Text(
+                    character,
+                    style: TextStyle(
+                      color: colorAnim.value,
+                      fontSize: sizeAnim.value,
+                      fontWeight: FontWeight.w300,
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-          AnimatedBuilder(
-            animation: controller,
-            builder: (context, _) {
-              final isNear = controller.value < 0.5;
-              return Text(
-                isNear ? '← 近く' : '遠く →',
-                style: const TextStyle(color: Colors.white38, fontSize: 13),
-              );
-            },
-          ),
-        ],
+                );
+              },
+            ),
+            const SizedBox(height: 48),
+            const Text(
+              'タップで切替',
+              style: TextStyle(color: Colors.white24, fontSize: 12),
+            ),
+          ],
+        ),
       ),
     );
   }

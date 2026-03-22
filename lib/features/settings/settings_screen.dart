@@ -29,6 +29,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _db.getSetting('notification_enabled', defaultValue: false) as bool;
     _notifyHour = _db.getSetting('notify_hour', defaultValue: 20) as int;
     _notifyMinute = _db.getSetting('notify_minute', defaultValue: 0) as int;
+    _purchase.addListener(_onPurchaseChanged);
+  }
+
+  @override
+  void dispose() {
+    _purchase.removeListener(_onPurchaseChanged);
+    super.dispose();
+  }
+
+  void _onPurchaseChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   Future<void> _toggleNotification(bool value) async {
@@ -74,12 +86,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _restorePurchases() async {
     await _purchase.restorePurchases();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('購入の復元を実行しました')),
-      );
-      setState(() {});
-    }
+    if (!mounted) return;
+    final message = _purchase.isPurchased ? '購入を復元しました' : '復元できる購入履歴がありませんでした';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> _launchUrl(String url) async {

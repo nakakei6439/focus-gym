@@ -32,7 +32,7 @@ extension TrainingTypeExtension on TrainingType {
   bool get isFree => this == TrainingType.nearFar;
 
   /// v1 リリースで使用可能か（nearFar のみ）
-  bool get isReleasedV1 => this == TrainingType.nearFar;
+  bool get isReleasedV1 => true;
 
   String get displayName {
     switch (this) {

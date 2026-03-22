@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/database/hive_service.dart';
+import '../../core/services/daily_limit_service.dart';
+import '../../core/services/purchase_service.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/widgets/references_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,9 +16,30 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _db = HiveService.instance;
+  final _limit = DailyLimitService.instance;
+  final _purchase = PurchaseService.instance;
+
+  GoRouter? _routerRef;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _routerRef?.routerDelegate.removeListener(_onRouteChanged);
+    _routerRef = GoRouter.of(context);
+    _routerRef!.routerDelegate.addListener(_onRouteChanged);
+  }
+
+  void _onRouteChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _routerRef?.routerDelegate.removeListener(_onRouteChanged);
+    super.dispose();
+  }
 
   int get _streakDays => _db.getStreakDays();
-  bool get _doneToday => _db.hasCompletedToday();
 
   String get _greetingMessage {
     final hour = DateTime.now().hour;
@@ -32,9 +56,9 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: Image.asset('assets/logo.png', width: 32, errorBuilder: (context, error, stack) {
-              return const Icon(Icons.visibility, color: AppTheme.primary, size: 28);
-            }),
+            child: Image.asset('assets/logo.png', width: 32,
+                errorBuilder: (context, error, stack) =>
+                    const Icon(Icons.visibility, color: AppTheme.primary, size: 28)),
           ),
         ],
       ),
@@ -45,13 +69,27 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 24),
-              Text(_greetingMessage, style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppTheme.textSecondary)),
+              Text(_greetingMessage,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyLarge
+                      ?.copyWith(color: AppTheme.textSecondary)),
               const SizedBox(height: 4),
-              Text('1日3分、目のジムへ', style: Theme.of(context).textTheme.headlineLarge),
-              const SizedBox(height: 28),
+              Text('毎日ちょっとずつ、目をケア',
+                  style: Theme.of(context).textTheme.headlineLarge),
+              const SizedBox(height: 20),
               _StreakCard(streakDays: _streakDays),
-              const SizedBox(height: 28),
-              _doneToday ? _DoneCard() : _StartButton(onTap: () => context.push('/training')),
+              const SizedBox(height: 12),
+              _DailyLimitBar(limit: _limit),
+              if (_purchase.isInTrial && !_purchase.isPurchased) ...[
+                const SizedBox(height: 12),
+                _TrialCard(remainingDays: _purchase.trialRemainingDays),
+              ],
+              const SizedBox(height: 20),
+              if (_limit.isLimitReached)
+                _DoneCard()
+              else
+                _StartButton(onTap: () => context.push('/training')),
               const Spacer(),
               _InfoBanner(),
               const SizedBox(height: 16),
@@ -82,19 +120,34 @@ class _StreakCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.local_fire_department_rounded, color: Colors.orangeAccent, size: 40),
+          const Icon(Icons.local_fire_department_rounded,
+              color: Colors.orangeAccent, size: 40),
           const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('連続達成', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70)),
+              Text('連続達成',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: Colors.white70)),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text('$streakDays', style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+                  Text('$streakDays',
+                      style: Theme.of(context)
+                          .textTheme
+                          .displayMedium
+                          ?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
                   const SizedBox(width: 4),
-                  Text('日', style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: Colors.white)),
+                  Text('日',
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineMedium
+                          ?.copyWith(color: Colors.white)),
                 ],
               ),
             ],
@@ -104,9 +157,90 @@ class _StreakCard extends StatelessWidget {
             Column(
               children: [
                 const Text('🏅', style: TextStyle(fontSize: 32)),
-                Text('${streakDays ~/ 7}週間', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
+                Text('${streakDays ~/ 7}週間',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.white70)),
               ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DailyLimitBar extends StatelessWidget {
+  final DailyLimitService limit;
+  const _DailyLimitBar({required this.limit});
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = limit.remainingSeconds;
+    final total = DailyLimitService.maxDailySeconds;
+    final progress = 1.0 - (remaining / total);
+    final color = limit.isLimitReached
+        ? Colors.red.shade300
+        : limit.isWarning
+            ? Colors.orange
+            : AppTheme.primary;
+    final m = remaining ~/ 60;
+    final s = remaining % 60;
+    final label = limit.isLimitReached
+        ? '今日の上限に達しました'
+        : '今日の残り: $m分${s.toString().padLeft(2, '0')}秒';
+
+    return Row(
+      children: [
+        Text(label,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: color, fontWeight: FontWeight.w500)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: AppTheme.surface,
+              valueColor: AlwaysStoppedAnimation(color),
+              minHeight: 6,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrialCard extends StatelessWidget {
+  final int remainingDays;
+  const _TrialCard({required this.remainingDays});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.hourglass_top_rounded,
+              color: AppTheme.primary, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '無料トライアル残り$remainingDays日 — 全機能をお試しください',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+            ),
+          ),
         ],
       ),
     );
@@ -127,12 +261,18 @@ class _StartButton extends StatelessWidget {
           label: const Text('今日のトレーニングを始める'),
           style: ElevatedButton.styleFrom(
             minimumSize: const Size(double.infinity, 70),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
+            textStyle:
+                const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
         ),
         const SizedBox(height: 12),
-        Text('3分で完了します', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary)),
+        Text('1分で完了します',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: AppTheme.textSecondary)),
       ],
     );
   }
@@ -151,11 +291,19 @@ class _DoneCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Text('✅', style: TextStyle(fontSize: 40)),
+          const Icon(Icons.check_circle_rounded, size: 40, color: AppTheme.primary),
           const SizedBox(height: 8),
-          Text('今日のトレーニング完了！', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: AppTheme.primary)),
+          Text('今日のトレーニング完了！',
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(color: AppTheme.primary)),
           const SizedBox(height: 4),
-          Text('また明日も一緒に頑張ろう', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary)),
+          Text('また明日も一緒に続けよう',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppTheme.textSecondary)),
         ],
       ),
     );
@@ -173,13 +321,33 @@ class _InfoBanner extends StatelessWidget {
         border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              '本アプリは医療行為ではありません。異常を感じた場合は医療機関へご相談ください。',
-              style: Theme.of(context).textTheme.bodySmall,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '本アプリは医療行為ではありません。眼の異常を感じた場合は医療機関へご相談ください。',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: () => showDialog(
+                    context: context,
+                    builder: (_) => const ReferencesDialog(),
+                  ),
+                  child: Text(
+                    '参考文献を見る →',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.blue,
+                          decoration: TextDecoration.underline,
+                        ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

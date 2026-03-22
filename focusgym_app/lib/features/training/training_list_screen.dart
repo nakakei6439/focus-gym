@@ -23,7 +23,7 @@ class TrainingListScreen extends StatelessWidget {
           children: [
             Text('今日はどれをやる？', style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 6),
-            Text('各トレーニングは3分間です', style: Theme.of(context).textTheme.bodySmall),
+            Text('各トレーニングは1分間です', style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 24),
             ...TrainingType.values.map((type) => _TrainingCard(type: type)),
           ],
