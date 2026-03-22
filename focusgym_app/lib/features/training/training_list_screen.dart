@@ -57,7 +57,7 @@ class _TrainingCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Center(
-                    child: Text(type.emoji, style: const TextStyle(fontSize: 28)),
+                    child: Icon(type.icon, size: 28, color: AppTheme.primary),
                   ),
                 ),
                 const SizedBox(width: 16),

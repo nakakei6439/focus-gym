@@ -294,7 +294,7 @@ class _DoneCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Text('✅', style: TextStyle(fontSize: 40)),
+          const Icon(Icons.check_circle, color: AppTheme.primary, size: 40),
           const SizedBox(height: 8),
           Text('今日のトレーニング完了！',
               style: Theme.of(context)

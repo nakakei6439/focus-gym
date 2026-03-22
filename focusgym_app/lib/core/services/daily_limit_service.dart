@@ -48,6 +48,12 @@ class DailyLimitService {
     return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 
+  /// 今日の残り時間をリセット（デバッグ用）
+  Future<void> resetDailySeconds() async {
+    await _db.saveSetting(HiveService.keyDailyTrainingSeconds, 0);
+    await _db.saveSetting(HiveService.keyLastTrainingDate, _todayString());
+  }
+
   String get remainingLabel {
     final mins = remainingSeconds ~/ 60;
     final secs = remainingSeconds % 60;
