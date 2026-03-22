@@ -113,19 +113,19 @@ extension TrainingTypeExtension on TrainingType {
   IconData get icon {
     switch (this) {
       case TrainingType.nearFar:
-        return Icons.zoom_in_map_rounded;
+        return Icons.center_focus_strong;
       case TrainingType.tracking:
-        return Icons.remove_red_eye_rounded;
+        return Icons.remove_red_eye;
       case TrainingType.blurClarity:
-        return Icons.blur_on_rounded;
+        return Icons.blur_on;
       case TrainingType.convergence:
-        return Icons.compare_arrows_rounded;
+        return Icons.compare_arrows;
       case TrainingType.saccade:
-        return Icons.speed_rounded;
+        return Icons.speed;
       case TrainingType.contrastAdapt:
-        return Icons.contrast_rounded;
+        return Icons.brightness_medium;
       case TrainingType.gaborPatch:
-        return Icons.grid_on_rounded;
+        return Icons.grid_on;
     }
   }
 }

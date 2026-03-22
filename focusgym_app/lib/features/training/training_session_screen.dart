@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/database/hive_service.dart';
 import '../../core/models/training_session.dart';
+import '../../core/services/daily_limit_service.dart';
 import '../../shared/theme/app_theme.dart';
 
 class TrainingSessionScreen extends StatefulWidget {
@@ -60,7 +61,8 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   int _remainingSeconds = _totalSeconds;
   bool _isPaused = false;
   bool _isStarted = false;
-  bool _isTargetingNear = false;
+  bool _isSmall = true;
+  bool _isAnimating = false;
   Timer? _countdownTimer;
 
   @override
@@ -89,6 +91,30 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       vsync: this,
       duration: const Duration(seconds: _totalSeconds),
     );
+
+  }
+
+  /// 遠近アニメーションを target まで実行し、完了時に状態を更新する。
+  /// 一時停止による cancel はcatchErrorで無視し、_isAnimating は true のまま保持する。
+  void _runNearFarAnimation(double target) {
+    setState(() => _isAnimating = true);
+    _trainingController
+        .animateTo(target, duration: _nearFarAnimDuration, curve: Curves.easeInOut)
+        .orCancel
+        .then((_) {
+          if (!mounted) return;
+          final reachedSmall = target == 0.0;
+          setState(() {
+            _isAnimating = false;
+            _isSmall = reachedSmall;
+            if (reachedSmall) {
+              _nearFarChar = _nearFarChars[_random.nextInt(_nearFarChars.length)];
+            }
+          });
+        })
+        .catchError((_) {
+          // 一時停止によるキャンセル → _isAnimating は true のまま保持
+        });
   }
 
   bool _shouldShowDistanceAlert() {
@@ -110,10 +136,10 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   void _startTraining() {
     setState(() {
       _isStarted = true;
-      _isTargetingNear = false;
+      _isSmall = true;
     });
     if (_type == TrainingType.nearFar) {
-      _trainingController.animateTo(0.0, duration: _nearFarAnimDuration, curve: Curves.easeInOut);
+      _runNearFarAnimation(1.0); // 小→大からスタート
     } else {
       _trainingController.repeat(reverse: true);
     }
@@ -122,17 +148,9 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   }
 
   void _onNearFarTap() {
-    if (_isPaused || !_isStarted) return;
-    setState(() {
-      _isTargetingNear = !_isTargetingNear;
-      _nearFarChar = _nearFarChars[_random.nextInt(_nearFarChars.length)];
-    });
+    if (_isPaused || !_isStarted || _isAnimating) return;
     HapticFeedback.lightImpact();
-    _trainingController.animateTo(
-      _isTargetingNear ? 1.0 : 0.0,
-      duration: _nearFarAnimDuration,
-      curve: Curves.easeInOut,
-    );
+    _runNearFarAnimation(_isSmall ? 1.0 : 0.0);
   }
 
   void _showDistanceAlert() {
@@ -168,11 +186,11 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
     if (_isPaused) {
       _trainingController.stop();
     } else if (_type == TrainingType.nearFar) {
-      _trainingController.animateTo(
-        _isTargetingNear ? 1.0 : 0.0,
-        duration: _nearFarAnimDuration,
-        curve: Curves.easeInOut,
-      );
+      if (_isAnimating) {
+        // 一時停止中断されたアニメーションを再開
+        _runNearFarAnimation(_isSmall ? 1.0 : 0.0);
+      }
+      // _isAnimating が false = タップ待ち状態のまま → 何もしない
     } else {
       _trainingController.repeat(reverse: true);
     }
@@ -186,6 +204,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       completed: true,
     );
     await HiveService.instance.saveSession(session);
+    await DailyLimitService.instance.addSeconds(_totalSeconds);
 
     if (!mounted) return;
     final streakDays = HiveService.instance.getStreakDays();
@@ -280,7 +299,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(_type.emoji, style: const TextStyle(fontSize: 72)),
+            Icon(_type.icon, size: 72, color: textColor),
             const SizedBox(height: 20),
             Text(
               _type.displayName,
@@ -314,7 +333,8 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
           controller: _trainingController,
           character: _nearFarChar,
           onTap: _onNearFarTap,
-          isTargetingNear: _isTargetingNear,
+          isSmall: _isSmall,
+          isAnimating: _isAnimating,
         );
       case TrainingType.tracking:
         return _TrackingTraining(controller: _trainingController);
@@ -379,12 +399,17 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('トレーニングを中断しますか？'),
-        content: const Text('進捗は保存されません。'),
+        content: const Text('経過時間は今日の残り時間に反映されます。'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('続ける')),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              final elapsed = _totalSeconds - _remainingSeconds;
+              if (elapsed > 0) {
+                await DailyLimitService.instance.addSeconds(elapsed);
+              }
+              if (!mounted) return;
               context.go('/home');
             },
             child: const Text('中断する', style: TextStyle(color: Colors.red)),
@@ -400,13 +425,15 @@ class _NearFarTraining extends StatelessWidget {
   final AnimationController controller;
   final String character;
   final VoidCallback onTap;
-  final bool isTargetingNear;
+  final bool isSmall;
+  final bool isAnimating;
 
   const _NearFarTraining({
     required this.controller,
     required this.character,
     required this.onTap,
-    required this.isTargetingNear,
+    required this.isSmall,
+    required this.isAnimating,
   });
 
   @override
@@ -430,7 +457,7 @@ class _NearFarTraining extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              isTargetingNear ? '← 近くを見てください' : '遠くを見てください →',
+              isSmall ? '遠くを見てください →' : '← 近くを見てください',
               style: const TextStyle(color: Colors.white54, fontSize: 14),
             ),
             const SizedBox(height: 48),
@@ -451,9 +478,13 @@ class _NearFarTraining extends StatelessWidget {
               },
             ),
             const SizedBox(height: 48),
-            const Text(
-              'タップで切替',
-              style: TextStyle(color: Colors.white24, fontSize: 12),
+            AnimatedOpacity(
+              opacity: isAnimating ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 300),
+              child: const Text(
+                'タップしてください',
+                style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500),
+              ),
             ),
           ],
         ),
