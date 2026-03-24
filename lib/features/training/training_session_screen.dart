@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/database/hive_service.dart';
@@ -22,18 +23,21 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
     with TickerProviderStateMixin {
   static const int _totalSeconds = 60; // 1分
 
-  // ランダムテキストリスト（遠近ピント切替）
-  static const List<String> _nearFarChars = [
-    'あ', 'い', 'う', 'え', 'お',
-    '愛', '山', '川', '木', '日', '花', '空', '海', '心', '光',
-    '１', '２', '３', '８', '０',
-    'A', 'E', 'F', 'R', 'S',
-  ];
+  // 記号リスト（遠近ピント切替）
+  static const List<String> _nearFarChars = ['●', '▲', '■', '◆', '★'];
+
+  Duration get _nearFarAnimDuration {
+    const startMs = 2000.0;
+    const endMs = 600.0;
+    const decay = 0.95;
+    final ms = (endMs + (startMs - endMs) * pow(decay, _tapCount)).round();
+    return Duration(milliseconds: ms.clamp(endMs.toInt(), startMs.toInt()));
+  }
 
   // ランダムフレーズリスト（ぼかし→くっきり）
   static const List<String> _blurPhrases = [
     '老眼トレーニング\nFocusGym',
-    '毎日3分間\n目の体操',
+    '毎日1分間\n目の体操',
     '近くと遠くを\n交互に見る',
     '目の筋肉を\nほぐしましょう',
     '視力を守ろう\n今日も続けて',
@@ -61,8 +65,11 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
 
   final _random = Random();
   int _remainingSeconds = _totalSeconds;
+  int _tapCount = 0;
   bool _isPaused = false;
   bool _isStarted = false;
+  bool _isSmall = true;
+  bool _isAnimating = false;
   Timer? _countdownTimer;
 
   @override
@@ -91,6 +98,27 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       vsync: this,
       duration: const Duration(seconds: _totalSeconds),
     );
+
+  }
+
+  /// 遠近アニメーションを target まで実行し、完了時に状態を更新する。
+  /// 一時停止による cancel はcatchErrorで無視し、_isAnimating は true のまま保持する。
+  void _runNearFarAnimation(double target) {
+    setState(() => _isAnimating = true);
+    _trainingController
+        .animateTo(target, duration: _nearFarAnimDuration, curve: Curves.easeInOut)
+        .orCancel
+        .then((_) {
+          if (!mounted) return;
+          final reachedSmall = target == 0.0;
+          setState(() {
+            _isAnimating = false;
+            _isSmall = reachedSmall;
+          });
+        })
+        .catchError((_) {
+          // 一時停止によるキャンセル → _isAnimating は true のまま保持
+        });
   }
 
   bool _shouldShowDistanceAlert() {
@@ -110,10 +138,30 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   }
 
   void _startTraining() {
-    setState(() => _isStarted = true);
-    _trainingController.repeat(reverse: true);
+    setState(() {
+      _isStarted = true;
+      _isSmall = true;
+    });
+    if (_type == TrainingType.nearFar) {
+      _runNearFarAnimation(1.0); // 小→大からスタート
+    } else {
+      _trainingController.repeat(reverse: true);
+    }
     _timerController.forward();
     _startCountdown();
+  }
+
+  void _onNearFarTap() {
+    if (_isPaused || !_isStarted || _isAnimating) return;
+    if (_isSmall) {
+      final remaining = _nearFarChars.where((c) => c != _nearFarChar).toList();
+      setState(() {
+        _nearFarChar = remaining[_random.nextInt(remaining.length)];
+      });
+    }
+    HapticFeedback.lightImpact();
+    _tapCount++;
+    _runNearFarAnimation(_isSmall ? 1.0 : 0.0);
   }
 
   void _showDistanceAlert() {
@@ -148,6 +196,12 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
     setState(() => _isPaused = !_isPaused);
     if (_isPaused) {
       _trainingController.stop();
+    } else if (_type == TrainingType.nearFar) {
+      if (_isAnimating) {
+        // 一時停止中断されたアニメーションを再開
+        _runNearFarAnimation(_isSmall ? 1.0 : 0.0);
+      }
+      // _isAnimating が false = タップ待ち状態のまま → 何もしない
     } else {
       _trainingController.repeat(reverse: true);
     }
@@ -188,7 +242,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   String get _instructionText {
     switch (_type) {
       case TrainingType.nearFar:
-        return '文字にピントを合わせてください';
+        return 'ピントが合ったらタップ';
       case TrainingType.tracking:
         return '目で追ってください';
       case TrainingType.blurClarity:
@@ -199,8 +253,6 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
         return '視点を素早く移してください';
       case TrainingType.contrastAdapt:
         return '薄い文字を読んでください';
-      case TrainingType.gaborPatch:
-        return '縞模様の向きを判定してください';
     }
   }
 
@@ -258,7 +310,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(_type.icon, size: 72, color: Colors.white70),
+            Icon(_type.icon, size: 72, color: textColor),
             const SizedBox(height: 20),
             Text(
               _type.displayName,
@@ -288,9 +340,15 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   Widget _buildTrainingArea() {
     switch (_type) {
       case TrainingType.nearFar:
-        return _NearFarTraining(controller: _trainingController, character: _nearFarChar);
+        return _NearFarTraining(
+          controller: _trainingController,
+          character: _nearFarChar,
+          onTap: _onNearFarTap,
+          isSmall: _isSmall,
+          isAnimating: _isAnimating,
+        );
       case TrainingType.tracking:
-        return _TrackingTraining(controller: _trainingController);
+        return _TrackingTraining(controller: _trainingController, speed: TrackingSpeed.medium);
       case TrainingType.blurClarity:
         return _BlurClarityTraining(controller: _trainingController, phrase: _blurPhrase);
       case TrainingType.convergence:
@@ -299,9 +357,6 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
         return _SaccadeTraining(controller: _trainingController);
       case TrainingType.contrastAdapt:
         return _ContrastAdaptTraining(controller: _trainingController, phrase: _contrastPhrase);
-      case TrainingType.gaborPatch:
-        // ガルボーパッチは専用画面で処理するため、ここには到達しない
-        return const SizedBox.shrink();
     }
   }
 
@@ -351,28 +406,22 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   }
 
   void _showQuitDialog(BuildContext context) {
-    _countdownTimer?.cancel();
-    _trainingController.stop();
-
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('トレーニングを中断しますか？'),
-        content: const Text('経過時間は保存されます。'),
+        content: const Text('経過時間は今日の残り時間に反映されます。'),
         actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _startCountdown();
-              _trainingController.repeat(reverse: true);
-            },
-            child: const Text('続ける'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('続ける')),
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await _savePartialSession();
-              if (mounted) context.go('/home');
+              final elapsed = _totalSeconds - _remainingSeconds;
+              if (elapsed > 0) {
+                await DailyLimitService.instance.addSeconds(elapsed);
+              }
+              if (!mounted) return;
+              context.go('/home');
             },
             child: const Text('中断する', style: TextStyle(color: Colors.red)),
           ),
@@ -380,79 +429,115 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       ),
     );
   }
-
-  Future<void> _savePartialSession() async {
-    final elapsed = _totalSeconds - _remainingSeconds;
-    if (elapsed <= 0) return;
-    final session = TrainingSession(
-      date: DateTime.now(),
-      type: _type,
-      durationSeconds: elapsed,
-      completed: false,
-    );
-    await HiveService.instance.saveSession(session);
-    await DailyLimitService.instance.addSeconds(elapsed);
-  }
 }
 
 // ① 遠近ピント切替トレーニング
 class _NearFarTraining extends StatelessWidget {
   final AnimationController controller;
   final String character;
-  const _NearFarTraining({required this.controller, required this.character});
+  final VoidCallback onTap;
+  final bool isSmall;
+  final bool isAnimating;
+
+  const _NearFarTraining({
+    required this.controller,
+    required this.character,
+    required this.onTap,
+    required this.isSmall,
+    required this.isAnimating,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final sizeAnim = Tween<double>(begin: 14, end: 60).animate(
+    final sizeAnim = Tween<double>(begin: 14, end: 100).animate(
       CurvedAnimation(parent: controller, curve: Curves.easeInOut),
     );
-    final opacityAnim = Tween<double>(begin: 0.4, end: 1.0).animate(
+    final opacityAnim = Tween<double>(begin: 0.35, end: 1.0).animate(
       CurvedAnimation(parent: controller, curve: Curves.easeInOut),
     );
+    final colorAnim = ColorTween(
+      begin: const Color(0xFFAADDFF), // 遠くは青白く（大気遠近法）
+      end: Colors.white,              // 近くは純白
+    ).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut));
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text('文字にピントを合わせてください', style: TextStyle(color: Colors.white54, fontSize: 14)),
-          const SizedBox(height: 40),
-          AnimatedBuilder(
-            animation: controller,
-            builder: (context, _) {
-              return Opacity(
-                opacity: opacityAnim.value,
-                child: Text(
-                  character,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: sizeAnim.value,
-                    fontWeight: FontWeight.bold,
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '記号にピントを合わせて',
+              style: const TextStyle(color: Colors.white54, fontSize: 14),
+            ),
+            const SizedBox(height: 48),
+            AnimatedBuilder(
+              animation: controller,
+              builder: (context, _) {
+                return Opacity(
+                  opacity: opacityAnim.value,
+                  child: Text(
+                    character,
+                    style: TextStyle(
+                      color: colorAnim.value,
+                      fontSize: sizeAnim.value,
+                      fontWeight: FontWeight.w300,
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-          AnimatedBuilder(
-            animation: controller,
-            builder: (context, _) {
-              final isNear = controller.value < 0.5;
-              return Text(
-                isNear ? '← 近く' : '遠く →',
-                style: const TextStyle(color: Colors.white38, fontSize: 13),
-              );
-            },
-          ),
-        ],
+                );
+              },
+            ),
+            const SizedBox(height: 48),
+            AnimatedBuilder(
+              animation: controller,
+              builder: (context, _) {
+                // 小→大（isSmall=true）: controller 0→1、75%以上で表示
+                // 大→小（isSmall=false）: controller 1→0、25%以下で表示
+                final nearCompletion = isSmall
+                    ? controller.value >= 0.75
+                    : controller.value <= 0.25;
+                final show = !isAnimating || nearCompletion;
+                return AnimatedOpacity(
+                  opacity: show ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 150),
+                  child: const Text(
+                    'タップしてください',
+                    style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 // ② 追従運動トレーニング
+enum TrackingSpeed {
+  low(Duration(milliseconds: 4000)),
+  medium(Duration(milliseconds: 2500)),
+  high(Duration(milliseconds: 1500));
+
+  const TrackingSpeed(this.duration);
+  final Duration duration;
+
+  String get label => switch (this) {
+        TrackingSpeed.low => '低速',
+        TrackingSpeed.medium => '中速',
+        TrackingSpeed.high => '高速',
+      };
+}
+
 class _TrackingTraining extends StatefulWidget {
   final AnimationController controller;
-  const _TrackingTraining({required this.controller});
+  final TrackingSpeed speed;
+  const _TrackingTraining({
+    required this.controller,
+    this.speed = TrackingSpeed.medium,
+  });
 
   @override
   State<_TrackingTraining> createState() => _TrackingTrainingState();
@@ -466,6 +551,7 @@ class _TrackingTrainingState extends State<_TrackingTraining> {
   @override
   void initState() {
     super.initState();
+    widget.controller.duration = widget.speed.duration;
     widget.controller.addStatusListener(_onAnimationStatus);
     _pickNextTarget();
   }
@@ -480,10 +566,17 @@ class _TrackingTrainingState extends State<_TrackingTraining> {
   }
 
   void _pickNextTarget() {
-    _nextTarget = Offset(
-      0.1 + _random.nextDouble() * 0.8,
-      0.1 + _random.nextDouble() * 0.8,
-    );
+    const minDistance = 0.30;
+    Offset candidate;
+    int attempts = 0;
+    do {
+      candidate = Offset(
+        0.05 + _random.nextDouble() * 0.90,
+        0.05 + _random.nextDouble() * 0.90,
+      );
+      attempts++;
+    } while ((_currentTarget - candidate).distance < minDistance && attempts < 10);
+    _nextTarget = candidate;
   }
 
   @override
@@ -756,7 +849,7 @@ class _SaccadePainter extends CustomPainter {
 
 // ⑥ コントラスト順応トレーニング
 // 薄いテキストが徐々に濃くなる。背景は白系。
-// エビデンス: Owsley et al. (2000, IOVS) - コントラスト感度をサポートする可能性
+// エビデンス: Polat et al. (2012, PLOS ONE) - コントラスト感度訓練で老眼改善
 class _ContrastAdaptTraining extends StatelessWidget {
   final AnimationController controller;
   final String phrase;
@@ -830,20 +923,14 @@ class _DistanceAlertDialogState extends State<_DistanceAlertDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(Icons.straighten_rounded),
-          SizedBox(width: 8),
-          Text('スマホを正しい位置で持とう'),
-        ],
-      ),
+      title: const Text('📏 スマホを正しい位置で持とう'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _tip(Icons.remove_red_eye_rounded, '目との距離：30〜40cm'),
-          _tip(Icons.lightbulb_outline_rounded, '明るい場所で行いましょう'),
-          _tip(Icons.stay_current_portrait_rounded, '画面を正面に向けて持つ'),
+          _tip('👁', '目との距離：30〜40cm'),
+          _tip('💡', '明るい場所で行いましょう'),
+          _tip('📐', '画面を正面に向けて持つ'),
           const SizedBox(height: 16),
           const Divider(),
           CheckboxListTile(
@@ -868,12 +955,12 @@ class _DistanceAlertDialogState extends State<_DistanceAlertDialog> {
     );
   }
 
-  Widget _tip(IconData icon, String text) {
+  Widget _tip(String emoji, String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppTheme.textSecondary),
+          Text(emoji, style: const TextStyle(fontSize: 18)),
           const SizedBox(width: 8),
           Text(text, style: const TextStyle(fontSize: 14)),
         ],

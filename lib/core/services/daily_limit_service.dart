@@ -23,7 +23,7 @@ class DailyLimitService {
   /// 今日の上限に達しているか
   bool get isLimitReached => todaySeconds >= maxDailySeconds;
 
-  /// 警告ゾーンか（残り3分以下）
+  /// 警告ゾーンか（残り1分以下）
   bool get isWarning => todaySeconds >= warningSeconds && !isLimitReached;
 
   /// トレーニング秒数を加算
@@ -46,6 +46,12 @@ class DailyLimitService {
   String _todayString() {
     final now = DateTime.now();
     return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  /// 今日の残り時間をリセット（デバッグ用）
+  Future<void> resetDailySeconds() async {
+    await _db.saveSetting(HiveService.keyDailyTrainingSeconds, 0);
+    await _db.saveSetting(HiveService.keyLastTrainingDate, _todayString());
   }
 
   String get remainingLabel {

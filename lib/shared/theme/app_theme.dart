@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // ナチュラル グリーン・クリーム パレット（女性向け）
-  static const Color primary = Color(0xFF5C9E7A);        // ソフトグリーン
-  static const Color primaryLight = Color(0xFF7DB896);   // ライトグリーン
-  static const Color background = Color(0xFFFAFAF5);     // クリーム白
-  static const Color surface = Color(0xFFF0F4EE);        // ライトグリーンサーフェス
-  static const Color textPrimary = Color(0xFF2D2D2D);
-  static const Color textSecondary = Color(0xFF6B7B6F);
-  static const Color accent = Color(0xFFE8A87C);         // ピーチ
+  static const Color primary = Color(0xFF1A6B4A);
+  static const Color primaryLight = Color(0xFF2E9B6E);
+  static const Color background = Color(0xFFF5F5F0);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color textPrimary = Color(0xFF1A1A1A);
+  static const Color textSecondary = Color(0xFF555555);
+  static const Color accent = Color(0xFFFF6B35);
 
   static ThemeData get theme {
     return ThemeData(
@@ -36,19 +35,18 @@ class AppTheme {
           backgroundColor: primary,
           foregroundColor: Colors.white,
           minimumSize: const Size(double.infinity, 60),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
       ),
       cardTheme: CardThemeData(
-        color: Colors.white,
-        elevation: 1,
-        shadowColor: Color(0x1A5C9E7A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        color: surface,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFFFAFAF5),
+        backgroundColor: surface,
         foregroundColor: textPrimary,
         elevation: 0,
         centerTitle: true,
@@ -59,7 +57,7 @@ class AppTheme {
         ),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: Colors.white,
+        backgroundColor: surface,
         selectedItemColor: primary,
         unselectedItemColor: textSecondary,
         selectedLabelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
