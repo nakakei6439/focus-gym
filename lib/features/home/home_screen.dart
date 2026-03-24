@@ -24,7 +24,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // ルート変更を検知してホーム画面を再描画する
     _routerRef?.routerDelegate.removeListener(_onRouteChanged);
     _routerRef = GoRouter.of(context);
     _routerRef!.routerDelegate.addListener(_onRouteChanged);
@@ -41,7 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   int get _streakDays => _db.getStreakDays();
-  bool get _doneToday => _db.hasCompletedToday();
 
   String get _greetingMessage {
     final hour = DateTime.now().hour;
@@ -84,12 +82,11 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 12),
               _DailyLimitBar(limit: _limit),
               if (_purchase.isInTrial && !_purchase.isPurchased) ...[
-                const SizedBox(height: 16),
                 const SizedBox(height: 12),
                 _TrialCard(remainingDays: _purchase.trialRemainingDays),
               ],
               const SizedBox(height: 20),
-              if (_doneToday)
+              if (_limit.isLimitReached)
                 _DoneCard()
               else
                 _StartButton(onTap: () => context.push('/training')),
@@ -191,7 +188,7 @@ class _DailyLimitBar extends StatelessWidget {
     final s = remaining % 60;
     final label = limit.isLimitReached
         ? '今日の上限に達しました'
-        : '今日の残り: ${m}分${s.toString().padLeft(2, '0')}秒';
+        : '今日の残り: $m分${s.toString().padLeft(2, '0')}秒';
 
     return Row(
       children: [
@@ -294,7 +291,7 @@ class _DoneCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Icon(Icons.check_circle, color: AppTheme.primary, size: 40),
+          const Icon(Icons.check_circle_rounded, size: 40, color: AppTheme.primary),
           const SizedBox(height: 8),
           Text('今日のトレーニング完了！',
               style: Theme.of(context)

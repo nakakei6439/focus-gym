@@ -57,7 +57,7 @@ class NotificationService {
     await _plugin.show(
       id: _reminderId,
       title: '目のジム、今日はやった？',
-      body: '1日3分のトレーニングで目の健康を守ろう 👁️',
+      body: '1日1分のトレーニングで目の健康を守ろう 👁️',
       notificationDetails: details,
     );
   }
@@ -86,7 +86,7 @@ class NotificationService {
     await _plugin.show(
       id: _reReminderId,
       title: 'まだ間に合う！',
-      body: '今日のトレーニング、寝る前に3分だけやってみよう ✨',
+      body: '今日のトレーニング、寝る前に1分だけやってみよう ✨',
       notificationDetails: details,
     );
   }

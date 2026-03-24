@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/database/hive_service.dart';
 import '../../core/notification/notification_service.dart';
+import '../../core/services/daily_limit_service.dart';
 import '../../core/services/purchase_service.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/references_dialog.dart';
@@ -84,6 +85,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return '$h:$m';
   }
 
+  Future<void> _resetDailyLimit() async {
+    await DailyLimitService.instance.resetDailySeconds();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('今日の残り時間をリセットしました')),
+    );
+    setState(() {});
+  }
+
   Future<void> _restorePurchases() async {
     await _purchase.restorePurchases();
     if (!mounted) return;
@@ -150,7 +160,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
 
-
             const SizedBox(height: 24),
 
             // 課金
@@ -185,6 +194,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         const EdgeInsets.symmetric(horizontal: 20),
                   ),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // デバッグ
+            Text('デバッグ', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 12),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.refresh_rounded,
+                    color: Colors.orange),
+                title: const Text('今日の残り時間をリセット',
+                    style: TextStyle(fontSize: 17)),
+                subtitle: Text(
+                  '残り ${DailyLimitService.instance.remainingLabel}',
+                  style: const TextStyle(color: AppTheme.textSecondary),
+                ),
+                onTap: _resetDailyLimit,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 20),
               ),
             ),
 

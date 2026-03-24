@@ -6,40 +6,15 @@
 # Claude IDE
 .claude/
 
-# Flutter/Dart
-focusgym_app/.dart_tool/
-focusgym_app/.flutter-plugins-dependencies
-focusgym_app/.pub-cache/
-focusgym_app/.pub/
-focusgym_app/build/
-focusgym_app/coverage/
-focusgym_app/**/*.class
-focusgym_app/**/*.log
-focusgym_app/**/*.pyc
-focusgym_app/**/*.swp
-focusgym_app/.atom/
-focusgym_app/.build/
-focusgym_app/.buildlog/
-focusgym_app/.history
-focusgym_app/.svn/
-focusgym_app/.swiftpm/
-focusgym_app/migrate_working_dir/
-focusgym_app/**/*.iml
-focusgym_app/**/*.ipr
-focusgym_app/**/*.iws
-focusgym_app/.idea/
-focusgym_app/**/doc/api/
-focusgym_app/**/ios/Flutter/.last_build_id
-focusgym_app/app.*.symbols
-focusgym_app/app.*.map.json
-focusgym_app/android/app/debug
-focusgym_app/android/app/profile
-focusgym_app/android/app/release
+# Internal planning docs (not for GitHub)
+CLAUDE.md
+COMMANDS.md
+planning/
 
 # Build artifacts
 build/
 
-# Flutter/Dart (root level)
+# Flutter/Dart
 .dart_tool/
 .flutter-plugins-dependencies
 .flutter-plugins
