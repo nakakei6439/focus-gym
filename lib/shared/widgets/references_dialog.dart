@@ -18,10 +18,10 @@ class ReferencesDialog extends StatelessWidget {
       url: 'https://pubmed.ncbi.nlm.nih.gov/21035483/',
     ),
     _Ref(
-      training: 'ぼかし→くっきり',
+      training: 'ぼけ文字識別',
       citation:
-          'Scheiman M & Wick B. Clinical Management of Binocular Vision: Heterophoric, Accommodative, and Eye Movement Disorders. 4th ed. Wolters Kluwer, 2014.',
-      url: null,
+          'Polat U et al. "Training the brain to overcome the effect of aging on the human eye." Scientific Reports, 2, 278, 2012.',
+      url: 'https://pubmed.ncbi.nlm.nih.gov/22355778/',
     ),
     _Ref(
       training: '輻輳運動',

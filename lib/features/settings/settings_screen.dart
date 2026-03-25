@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/database/hive_service.dart';
+import '../../core/models/training_session.dart';
 import '../../core/notification/notification_service.dart';
 import '../../core/services/daily_limit_service.dart';
 import '../../core/services/purchase_service.dart';
@@ -22,6 +23,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationEnabled = false;
   int _notifyHour = 20;
   int _notifyMinute = 0;
+  bool _debugModeEnabled = false;
 
   @override
   void initState() {
@@ -30,6 +32,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _db.getSetting('notification_enabled', defaultValue: false) as bool;
     _notifyHour = _db.getSetting('notify_hour', defaultValue: 20) as int;
     _notifyMinute = _db.getSetting('notify_minute', defaultValue: 0) as int;
+    _debugModeEnabled =
+        _db.getSetting('debug_mode_enabled', defaultValue: false) as bool;
     _purchase.addListener(_onPurchaseChanged);
   }
 
@@ -92,6 +96,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
       const SnackBar(content: Text('今日の残り時間をリセットしました')),
     );
     setState(() {});
+  }
+
+  void _showSymbolListDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('記号一覧'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: kBlurSymbolGroups.entries.map((entry) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      entry.key,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: Colors.grey),
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: entry.value
+                        .map((s) =>
+                            Text(s, style: const TextStyle(fontSize: 32)))
+                        .toList(),
+                  ),
+                  const Divider(height: 24),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _restorePurchases() async {
@@ -203,18 +254,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Text('デバッグ', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 12),
             Card(
-              child: ListTile(
-                leading: const Icon(Icons.refresh_rounded,
-                    color: Colors.orange),
-                title: const Text('今日の残り時間をリセット',
-                    style: TextStyle(fontSize: 17)),
-                subtitle: Text(
-                  '残り ${DailyLimitService.instance.remainingLabel}',
-                  style: const TextStyle(color: AppTheme.textSecondary),
-                ),
-                onTap: _resetDailyLimit,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    secondary: const Icon(Icons.bug_report_outlined,
+                        color: Colors.orange),
+                    title: const Text('デバッグモード',
+                        style: TextStyle(fontSize: 17)),
+                    value: _debugModeEnabled,
+                    onChanged: (v) {
+                      _db.saveSetting('debug_mode_enabled', v);
+                      setState(() => _debugModeEnabled = v);
+                    },
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.refresh_rounded,
+                        color: Colors.orange),
+                    title: const Text('今日の残り時間をリセット',
+                        style: TextStyle(fontSize: 17)),
+                    subtitle: Text(
+                      '残り ${DailyLimitService.instance.remainingLabel}',
+                      style:
+                          const TextStyle(color: AppTheme.textSecondary),
+                    ),
+                    onTap: _resetDailyLimit,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  if (_debugModeEnabled) ...[
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.font_download_outlined,
+                          color: Colors.orange),
+                      title: const Text('記号一覧を確認',
+                          style: TextStyle(fontSize: 17)),
+                      subtitle: const Text('ぼけ文字識別で使う全記号を表示'),
+                      onTap: _showSymbolListDialog,
+                      trailing: const Icon(Icons.chevron_right_rounded,
+                          color: AppTheme.textSecondary),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 20),
+                    ),
+                  ],
+                ],
               ),
             ),
 

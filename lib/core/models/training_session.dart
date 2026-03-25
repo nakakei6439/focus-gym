@@ -3,6 +3,19 @@ import 'package:hive/hive.dart';
 
 part 'training_session.g.dart';
 
+/// ぼけ文字識別トレーニングで使用する記号グループ
+/// キー: グループ名（デバッグ表示用）、値: 記号リスト
+/// 全てU+25A0-U+25FF Geometric Shapes ブロック — iOSで絵文字化しない
+const kBlurSymbolGroups = <String, List<String>>{
+  '丸系':        ['●', '○', '◉', '◎', '◐', '◑', '◒', '◓', '◔', '◕'],
+  '四角系':      ['■', '□', '▢', '▤', '▥', '▦', '▧', '▨', '▩', '◧', '◨'],
+  '三角系':      ['▲', '▼', '△', '▽', '◤', '◥', '◢', '◣'],
+  '方向系':      ['▸', '◂', '▷', '◁'],
+  'ひし形・円系': ['◆', '◇', '◈', '◊', '◌', '◍'],
+  '半分塗り系':   ['◩', '◪', '◫', '◬', '◭', '◮'],
+  '縦横系':      ['▬', '▭', '▰', '▱'],
+};
+
 @HiveType(typeId: 0)
 enum TrainingType {
   @HiveField(0)
@@ -32,7 +45,7 @@ extension TrainingTypeExtension on TrainingType {
       case TrainingType.tracking:
         return '追従運動';
       case TrainingType.blurClarity:
-        return 'ぼかし→くっきり';
+        return 'ぼけ文字識別';
       case TrainingType.convergence:
         return '輻輳運動';
       case TrainingType.saccade:
@@ -49,7 +62,7 @@ extension TrainingTypeExtension on TrainingType {
       case TrainingType.tracking:
         return '動くボールを目で追って\n眼の筋肉を動かす';
       case TrainingType.blurClarity:
-        return 'ぼやけた文字に\nピントを合わせる練習';
+        return '一瞬のぼけ記号を識別して\n視覚処理を鍛える';
       case TrainingType.convergence:
         return '両目を内側・外側に動かして\n遠近調節の連動を鍛える';
       case TrainingType.saccade:

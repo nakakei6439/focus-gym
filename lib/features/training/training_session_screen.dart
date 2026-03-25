@@ -34,17 +34,6 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
     return Duration(milliseconds: ms.clamp(endMs.toInt(), startMs.toInt()));
   }
 
-  // ランダムフレーズリスト（ぼかし→くっきり）
-  static const List<String> _blurPhrases = [
-    '老眼トレーニング\nFocusGym',
-    '毎日1分間\n目の体操',
-    '近くと遠くを\n交互に見る',
-    '目の筋肉を\nほぐしましょう',
-    '視力を守ろう\n今日も続けて',
-    '目はいつも\n頑張っている',
-    '健康な目で\n毎日を楽しむ',
-  ];
-
   // ランダムフレーズリスト（コントラスト順応）
   static const List<String> _contrastPhrases = [
     '目のトレーニング\n毎日続けよう',
@@ -60,7 +49,6 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   late AnimationController _trainingController;
   late AnimationController _timerController;
   late String _nearFarChar;
-  late String _blurPhrase;
   late String _contrastPhrase;
 
   final _random = Random();
@@ -82,7 +70,6 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
 
     // セッションごとにランダムなテキストを選択
     _nearFarChar = _nearFarChars[_random.nextInt(_nearFarChars.length)];
-    _blurPhrase = _blurPhrases[_random.nextInt(_blurPhrases.length)];
     _contrastPhrase = _contrastPhrases[_random.nextInt(_contrastPhrases.length)];
 
     final trainingDuration = _type == TrainingType.contrastAdapt
@@ -144,6 +131,10 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
     });
     if (_type == TrainingType.nearFar) {
       _runNearFarAnimation(1.0); // 小→大からスタート
+    } else if (_type == TrainingType.blurClarity) {
+      // Widget 内の initState で自己起動（コントローラー不使用）
+    } else if (_type == TrainingType.tracking) {
+      _trainingController.forward(); // 追従運動: 一方向のみ（折り返しなし）
     } else {
       _trainingController.repeat(reverse: true);
     }
@@ -202,6 +193,10 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
         _runNearFarAnimation(_isSmall ? 1.0 : 0.0);
       }
       // _isAnimating が false = タップ待ち状態のまま → 何もしない
+    } else if (_type == TrainingType.blurClarity) {
+      // isPaused プロパティ経由で Widget 内制御
+    } else if (_type == TrainingType.tracking) {
+      _trainingController.forward(); // 追従運動: 現在位置から再開
     } else {
       _trainingController.repeat(reverse: true);
     }
@@ -246,7 +241,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       case TrainingType.tracking:
         return '目で追ってください';
       case TrainingType.blurClarity:
-        return '文字が見えるまで待ってください';
+        return '見えた記号を選んでください';
       case TrainingType.convergence:
         return '両目を内側・外側に動かしてください';
       case TrainingType.saccade:
@@ -350,7 +345,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       case TrainingType.tracking:
         return _TrackingTraining(controller: _trainingController, speed: TrackingSpeed.medium);
       case TrainingType.blurClarity:
-        return _BlurClarityTraining(controller: _trainingController, phrase: _blurPhrase);
+        return _BlurIdentificationTraining(isPaused: _isPaused);
       case TrainingType.convergence:
         return _ConvergenceTraining(controller: _trainingController);
       case TrainingType.saccade:
@@ -546,37 +541,66 @@ class _TrackingTraining extends StatefulWidget {
 class _TrackingTrainingState extends State<_TrackingTraining> {
   Offset _currentTarget = const Offset(0.5, 0.5);
   Offset _nextTarget = const Offset(0.5, 0.5);
+  int _currentZone = 4; // 3×3グリッドの中央ゾーン（0〜8）
+  int _targetCount = 0; // 適応速度用カウンタ
   final _random = Random();
+
+  // 修正3: 適応速度 — セッション開始は 3500ms、徐々に 1500ms まで加速
+  Duration get _currentDuration {
+    const startMs = 3500.0;
+    const endMs = 1500.0;
+    const decay = 0.92;
+    final ms = endMs + (startMs - endMs) * pow(decay, _targetCount);
+    return Duration(milliseconds: ms.round().clamp(endMs.toInt(), startMs.toInt()));
+  }
+
+  // 修正2: 座標からゾーン番号（0〜8）を計算
+  int _zoneOf(Offset pos) {
+    final col = (pos.dx * 3).clamp(0.0, 2.9999).toInt();
+    final row = (pos.dy * 3).clamp(0.0, 2.9999).toInt();
+    return row * 3 + col;
+  }
 
   @override
   void initState() {
     super.initState();
-    widget.controller.duration = widget.speed.duration;
+    widget.controller.duration = _currentDuration;
     widget.controller.addStatusListener(_onAnimationStatus);
     _pickNextTarget();
   }
 
+  // 修正1: completed のみ処理し、forward(from:0) で次ターゲットへ一方向移動
   void _onAnimationStatus(AnimationStatus status) {
-    if (status == AnimationStatus.completed || status == AnimationStatus.dismissed) {
+    if (status == AnimationStatus.completed) {
       setState(() {
         _currentTarget = _nextTarget;
+        _currentZone = _zoneOf(_currentTarget);
+        _targetCount++;
         _pickNextTarget();
       });
+      widget.controller.duration = _currentDuration;
+      widget.controller.forward(from: 0.0);
     }
   }
 
+  // 修正2: 3×3ゾーン分割で画面全体を均等カバー（現在ゾーンを除いて選択）
   void _pickNextTarget() {
-    const minDistance = 0.30;
-    Offset candidate;
-    int attempts = 0;
-    do {
-      candidate = Offset(
-        0.05 + _random.nextDouble() * 0.90,
-        0.05 + _random.nextDouble() * 0.90,
-      );
-      attempts++;
-    } while ((_currentTarget - candidate).distance < minDistance && attempts < 10);
-    _nextTarget = candidate;
+    const padding = 0.06;
+    const zoneSize = (1.0 - padding * 2) / 3;
+
+    final candidateZones = List.generate(9, (i) => i)
+        .where((z) => z != _currentZone)
+        .toList()
+      ..shuffle(_random);
+
+    final targetZone = candidateZones.first;
+    final col = targetZone % 3;
+    final row = targetZone ~/ 3;
+
+    _nextTarget = Offset(
+      padding + col * zoneSize + _random.nextDouble() * zoneSize,
+      padding + row * zoneSize + _random.nextDouble() * zoneSize,
+    );
   }
 
   @override
@@ -631,61 +655,213 @@ class _TrackingPainter extends CustomPainter {
   bool shouldRepaint(_TrackingPainter old) => old.position != position;
 }
 
-// ③ ぼかし→くっきり刺激トレーニング
-class _BlurClarityTraining extends StatelessWidget {
-  final AnimationController controller;
-  final String phrase;
-  const _BlurClarityTraining({required this.controller, required this.phrase});
+// ③ ぼけ文字識別トレーニング
+// ぼけた記号を一瞬見て何かを当てる → 脳の視覚処理（知覚学習）を鍛える
+// エビデンス: Polat et al. (2012, Scientific Reports) - 劣化視覚刺激による神経可塑性
+enum _IdentPhase { showing, choosing, feedback }
+
+class _BlurIdentificationTraining extends StatefulWidget {
+  final bool isPaused;
+  const _BlurIdentificationTraining({required this.isPaused});
+
+  @override
+  State<_BlurIdentificationTraining> createState() =>
+      _BlurIdentificationTrainingState();
+}
+
+class _BlurIdentificationTrainingState
+    extends State<_BlurIdentificationTraining> {
+  // 記号グループは training_session.dart の kBlurSymbolGroups を参照
+  static List<List<String>> get _symbolGroups =>
+      kBlurSymbolGroups.values.toList();
+
+  static List<String> get _symbols =>
+      _symbolGroups.expand((g) => g).toList();
+
+  List<String> _groupOf(String symbol) =>
+      _symbolGroups.firstWhere((g) => g.contains(symbol),
+          orElse: () => _symbols);
+
+  _IdentPhase _phase = _IdentPhase.showing;
+  String _target = '';
+  String _lastTarget = ''; // 連続同一記号の防止
+  List<String> _choices = []; // 毎ラウンドの3択
+  bool? _isCorrect;
+  int _correctCount = 0;
+  Timer? _phaseTimer;
+  final _random = Random();
+
+  // 適応難易度: 表示時間 400ms → 120ms（閾値訓練レンジ、Polat 2012 と整合）
+  Duration get _showDuration {
+    const startMs = 400.0, endMs = 120.0;
+    final ms = endMs + (startMs - endMs) * pow(0.88, _correctCount);
+    return Duration(milliseconds: ms.round().clamp(120, 400));
+  }
+
+  // 適応難易度: ブラーσ 10.0 → 3.0（正解するたびに見やすくなるが表示時間で難易度維持）
+  double get _blurSigma {
+    const start = 10.0, end = 3.0;
+    return end + (start - end) * pow(0.95, _correctCount);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _startRound();
+  }
+
+  void _startRound() {
+    // 直前と同じ記号を除外してターゲット選択
+    final allSymbols = _symbols;
+    final candidates = allSymbols.where((s) => s != _lastTarget).toList();
+    _lastTarget = _target;
+    _target = candidates[_random.nextInt(candidates.length)];
+
+    // 同一グループから選択肢を生成（視覚的に似た記号で難易度を上げる）
+    final group = _groupOf(_target);
+    final sameGroup = group.where((s) => s != _target && s != _lastTarget).toList()
+      ..shuffle(_random);
+    final distractors = sameGroup.length >= 2
+        ? sameGroup.take(2).toList()
+        : (allSymbols.where((s) => s != _target).toList()..shuffle(_random))
+            .take(2)
+            .toList();
+    final choices = [_target, ...distractors]..shuffle(_random);
+
+    setState(() {
+      _choices = choices;
+      _phase = _IdentPhase.showing;
+      _isCorrect = null;
+    });
+    _phaseTimer = Timer(_showDuration, () {
+      if (!mounted) return;
+      setState(() => _phase = _IdentPhase.choosing);
+    });
+  }
+
+  void _onChoiceTap(String choice) {
+    if (_phase != _IdentPhase.choosing) return;
+    final correct = choice == _target;
+    setState(() {
+      _isCorrect = correct;
+      _phase = _IdentPhase.feedback;
+      if (correct) _correctCount++;
+    });
+    HapticFeedback.lightImpact();
+    _phaseTimer = Timer(const Duration(milliseconds: 1000), () {
+      if (!mounted) return;
+      _startRound();
+    });
+  }
+
+  @override
+  void didUpdateWidget(_BlurIdentificationTraining old) {
+    super.didUpdateWidget(old);
+    if (old.isPaused == widget.isPaused) return;
+    if (widget.isPaused) {
+      _phaseTimer?.cancel();
+    } else {
+      // 再開: showing フェーズなら新ラウンドをスタート
+      if (_phase == _IdentPhase.showing) _startRound();
+      // choosing / feedback はそのまま表示継続
+    }
+  }
+
+  @override
+  void dispose() {
+    _phaseTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final blurAnim = Tween<double>(begin: 16.0, end: 0.0).animate(
-      CurvedAnimation(parent: controller, curve: Curves.easeInOut),
-    );
-
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text('文字にピントを合わせてください', style: TextStyle(color: Colors.white54, fontSize: 14)),
-          const SizedBox(height: 48),
-          AnimatedBuilder(
-            animation: controller,
-            builder: (context, _) {
-              return ImageFiltered(
-                imageFilter: ImageFilter.blur(
-                  sigmaX: blurAnim.value,
-                  sigmaY: blurAnim.value,
-                ),
-                child: Text(
-                  phrase,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    height: 1.5,
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 32),
-          AnimatedBuilder(
-            animation: controller,
-            builder: (context, _) {
-              final isClear = controller.value > 0.7;
-              return Text(
-                isClear ? 'くっきり見えていますか？' : 'ぼやけています...',
-                style: TextStyle(
-                  color: isClear ? AppTheme.primaryLight : Colors.white38,
-                  fontSize: 14,
-                ),
-              );
-            },
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildInstruction(),
+            const SizedBox(height: 48),
+            _buildMainArea(),
+            const SizedBox(height: 48),
+            if (_phase == _IdentPhase.choosing) _buildChoices(),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildInstruction() {
+    final text = switch (_phase) {
+      _IdentPhase.showing  => 'この記号を覚えてください',
+      _IdentPhase.choosing => '見えた記号はどれ？',
+      _IdentPhase.feedback => _isCorrect! ? '正解！' : '残念... $_target でした',
+    };
+    final color = switch (_phase) {
+      _IdentPhase.feedback when !(_isCorrect!) => Colors.redAccent,
+      _IdentPhase.feedback                     => AppTheme.primaryLight,
+      _                                        => Colors.white54,
+    };
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child: Text(
+        text,
+        key: ValueKey(_phase),
+        style: TextStyle(color: color, fontSize: 16),
+      ),
+    );
+  }
+
+  Widget _buildMainArea() {
+    if (_phase == _IdentPhase.showing) {
+      return ImageFiltered(
+        imageFilter: ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma),
+        child: Text(
+          _target,
+          style: const TextStyle(
+              color: Colors.white, fontSize: 96, fontWeight: FontWeight.w300),
+        ),
+      );
+    }
+    if (_phase == _IdentPhase.feedback) {
+      return Text(
+        _target,
+        style: TextStyle(
+          color: _isCorrect! ? AppTheme.primaryLight : Colors.redAccent,
+          fontSize: 96,
+          fontWeight: FontWeight.w300,
+        ),
+      );
+    }
+    // choosing フェーズ: 記号は非表示
+    return const SizedBox(height: 96);
+  }
+
+  Widget _buildChoices() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: _choices.map((s) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: GestureDetector(
+            onTap: () => _onChoiceTap(s),
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: Colors.white12,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                s,
+                style: const TextStyle(color: Colors.white, fontSize: 32),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
