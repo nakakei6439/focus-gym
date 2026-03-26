@@ -254,8 +254,6 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
         return '見えた記号を選んでください';
       case TrainingType.convergence:
         return '両目を内側・外側に動かしてください';
-      case TrainingType.saccade:
-        return '視点を素早く移してください';
       case TrainingType.contrastAdapt:
         return '薄い文字を読んでください';
     }
@@ -362,8 +360,6 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
         );
       case TrainingType.convergence:
         return _ConvergencePhoneMotionTraining(isPaused: _isPaused, onComplete: _onComplete);
-      case TrainingType.saccade:
-        return _SaccadeTraining(controller: _trainingController);
       case TrainingType.contrastAdapt:
         return _ContrastAdaptTraining(controller: _trainingController, phrase: _contrastPhrase);
     }
@@ -1213,80 +1209,6 @@ class _ConvergenceDotPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ConvergenceDotPainter old) => old.t != t;
-}
-
-// ⑤ 視点移動（サッカード）トレーニング
-// 対角のターゲットへ素早く視点を移動させる
-// エビデンス: Ciuffreda & Tannen (1995) - サッカード訓練で読書速度向上
-class _SaccadeTraining extends StatelessWidget {
-  final AnimationController controller;
-  const _SaccadeTraining({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return AnimatedBuilder(
-          animation: controller,
-          builder: (context, _) {
-            final isPhaseA = controller.value < 0.5;
-            // フェーズA: 左上・右下 ／ フェーズB: 右上・左下
-            final margin = 60.0;
-            final w = constraints.maxWidth;
-            final h = constraints.maxHeight;
-
-            final pos1 = isPhaseA
-                ? Offset(margin, margin)
-                : Offset(w - margin, margin);
-            final pos2 = isPhaseA
-                ? Offset(w - margin, h - margin)
-                : Offset(margin, h - margin);
-
-            // アクティブターゲットをパルスさせる（sin波で拡大縮小）
-            final pulse = 1.0 + 0.15 * sin(controller.value * 2 * pi * 4);
-
-            return CustomPaint(
-              painter: _SaccadePainter(pos1: pos1, pos2: pos2, pulse: pulse),
-              child: const SizedBox.expand(),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _SaccadePainter extends CustomPainter {
-  final Offset pos1;
-  final Offset pos2;
-  final double pulse;
-  _SaccadePainter({required this.pos1, required this.pos2, required this.pulse});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // 2つのターゲットを結ぶ線（視線方向を示す）
-    final linePaint = Paint()
-      ..color = Colors.white12
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(pos1, pos2, linePaint);
-
-    final glowPaint = Paint()
-      ..color = AppTheme.primary.withValues(alpha: 0.35)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
-    final dotPaint = Paint()..color = AppTheme.primary;
-    final centerPaint = Paint()..color = Colors.white;
-
-    for (final pos in [pos1, pos2]) {
-      canvas.drawCircle(pos, 30 * pulse, glowPaint);
-      canvas.drawCircle(pos, 20 * pulse, dotPaint);
-      canvas.drawCircle(pos, 7, centerPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_SaccadePainter old) =>
-      old.pos1 != pos1 || old.pos2 != pos2 || old.pulse != pulse;
 }
 
 // ⑥ コントラスト順応トレーニング

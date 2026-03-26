@@ -64,8 +64,6 @@ class TrainingTypeAdapter extends TypeAdapter<TrainingType> {
         return TrainingType.blurClarity;
       case 3:
         return TrainingType.convergence;
-      case 4:
-        return TrainingType.saccade;
       case 5:
         return TrainingType.contrastAdapt;
       default:
@@ -87,9 +85,6 @@ class TrainingTypeAdapter extends TypeAdapter<TrainingType> {
         break;
       case TrainingType.convergence:
         writer.writeByte(3);
-        break;
-      case TrainingType.saccade:
-        writer.writeByte(4);
         break;
       case TrainingType.contrastAdapt:
         writer.writeByte(5);

@@ -30,9 +30,6 @@ enum TrainingType {
   @HiveField(3)
   convergence,
 
-  @HiveField(4)
-  saccade,
-
   @HiveField(5)
   contrastAdapt,
 }
@@ -48,8 +45,6 @@ extension TrainingTypeExtension on TrainingType {
         return 'ぼけ文字識別';
       case TrainingType.convergence:
         return '寄り目トレーニング';
-      case TrainingType.saccade:
-        return '視点移動トレーニング';
       case TrainingType.contrastAdapt:
         return 'コントラスト順応';
     }
@@ -65,8 +60,6 @@ extension TrainingTypeExtension on TrainingType {
         return '一瞬のぼけ記号を識別して\n視覚処理を鍛える';
       case TrainingType.convergence:
         return '画面を顔に近づけて\n輻輳筋を直接トレーニング';
-      case TrainingType.saccade:
-        return '画面の端から端へ視点を素早く\n動かして眼の反応速度を鍛える';
       case TrainingType.contrastAdapt:
         return '薄いグレーの文字に焦点を合わせて\nコントラスト感度を鍛える';
     }
@@ -82,8 +75,6 @@ extension TrainingTypeExtension on TrainingType {
         return '🔍';
       case TrainingType.convergence:
         return '👀';
-      case TrainingType.saccade:
-        return '⚡';
       case TrainingType.contrastAdapt:
         return '🌗';
     }
@@ -99,8 +90,6 @@ extension TrainingTypeExtension on TrainingType {
         return Icons.blur_on_rounded;
       case TrainingType.convergence:
         return Icons.compare_arrows_rounded;
-      case TrainingType.saccade:
-        return Icons.speed_rounded;
       case TrainingType.contrastAdapt:
         return Icons.contrast_rounded;
     }
