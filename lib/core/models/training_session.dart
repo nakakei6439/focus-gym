@@ -47,7 +47,7 @@ extension TrainingTypeExtension on TrainingType {
       case TrainingType.blurClarity:
         return 'ぼけ文字識別';
       case TrainingType.convergence:
-        return '輻輳運動';
+        return '寄り目トレーニング';
       case TrainingType.saccade:
         return '視点移動トレーニング';
       case TrainingType.contrastAdapt:
@@ -64,7 +64,7 @@ extension TrainingTypeExtension on TrainingType {
       case TrainingType.blurClarity:
         return '一瞬のぼけ記号を識別して\n視覚処理を鍛える';
       case TrainingType.convergence:
-        return '両目を内側・外側に動かして\n遠近調節の連動を鍛える';
+        return '画面を顔に近づけて\n輻輳筋を直接トレーニング';
       case TrainingType.saccade:
         return '画面の端から端へ視点を素早く\n動かして眼の反応速度を鍛える';
       case TrainingType.contrastAdapt:

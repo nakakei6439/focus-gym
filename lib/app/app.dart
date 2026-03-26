@@ -71,13 +71,6 @@ final _router = GoRouter(
     ),
     GoRoute(path: '/training', builder: (context, state) => const TrainingListScreen()),
     GoRoute(
-      path: '/training/:type',
-      builder: (context, state) {
-        final type = state.pathParameters['type'] ?? 'nearFar';
-        return TrainingSessionScreen(trainingType: type);
-      },
-    ),
-    GoRoute(
       path: '/training/complete',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>?;
@@ -85,6 +78,13 @@ final _router = GoRouter(
           trainingTypeName: extra?['typeName'] as String? ?? '',
           streakDays: extra?['streakDays'] as int? ?? 0,
         );
+      },
+    ),
+    GoRoute(
+      path: '/training/:type',
+      builder: (context, state) {
+        final type = state.pathParameters['type'] ?? 'nearFar';
+        return TrainingSessionScreen(trainingType: type);
       },
     ),
   ],

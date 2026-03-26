@@ -24,10 +24,10 @@ class ReferencesDialog extends StatelessWidget {
       url: 'https://pubmed.ncbi.nlm.nih.gov/22355778/',
     ),
     _Ref(
-      training: '輻輳運動',
+      training: '寄り目トレーニング',
       citation:
-          'CITT Study Group. "Randomized clinical trial of treatments for symptomatic convergence insufficiency in children." Archives of Ophthalmology, 126(10), 1336–1349, 2008.',
-      url: 'https://pubmed.ncbi.nlm.nih.gov/18852411/',
+          'CITT-ART Investigator Group. "Effect of Vergence/Accommodative Therapy on Reading in Children With Convergence Insufficiency." Optometry and Vision Science, 96(11), 836–849, 2019.',
+      url: 'https://pubmed.ncbi.nlm.nih.gov/31688558/',
     ),
     _Ref(
       training: '視点移動',

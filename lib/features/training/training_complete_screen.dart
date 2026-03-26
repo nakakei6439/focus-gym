@@ -141,13 +141,13 @@ class _TrainingCompleteScreenState extends State<TrainingCompleteScreen>
                     ),
                     const Spacer(),
                     ElevatedButton(
-                      onPressed: () => context.go('/home'),
-                      child: const Text('ホームに戻る'),
+                      onPressed: () => context.go('/training'),
+                      child: const Text('トレーニング一覧に戻る'),
                     ),
                     const SizedBox(height: 12),
                     TextButton(
-                      onPressed: () => context.push('/training'),
-                      child: const Text('もう1種目やる'),
+                      onPressed: () => context.go('/home'),
+                      child: const Text('ホームに戻る'),
                     ),
                     const SizedBox(height: 20),
                   ],

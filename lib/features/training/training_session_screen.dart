@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 import '../../core/database/hive_service.dart';
 import '../../core/models/training_session.dart';
@@ -58,6 +60,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   bool _isStarted = false;
   bool _isSmall = true;
   bool _isAnimating = false;
+  bool _isCompleting = false;
   Timer? _countdownTimer;
 
   @override
@@ -133,6 +136,8 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       _runNearFarAnimation(1.0); // 小→大からスタート
     } else if (_type == TrainingType.blurClarity) {
       // Widget 内の initState で自己起動（コントローラー不使用）
+    } else if (_type == TrainingType.convergence) {
+      // Widget 内のカメラで自己制御（コントローラー不使用）
     } else if (_type == TrainingType.tracking) {
       _trainingController.forward(); // 追従運動: 一方向のみ（折り返しなし）
     } else {
@@ -195,6 +200,8 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       // _isAnimating が false = タップ待ち状態のまま → 何もしない
     } else if (_type == TrainingType.blurClarity) {
       // isPaused プロパティ経由で Widget 内制御
+    } else if (_type == TrainingType.convergence) {
+      // isPaused プロパティ経由で Widget 内制御
     } else if (_type == TrainingType.tracking) {
       _trainingController.forward(); // 追従運動: 現在位置から再開
     } else {
@@ -203,6 +210,8 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   }
 
   Future<void> _onComplete() async {
+    if (_isCompleting) return;
+    _isCompleting = true;
     final session = TrainingSession(
       date: DateTime.now(),
       type: _type,
@@ -213,11 +222,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
     await DailyLimitService.instance.addSeconds(_totalSeconds);
 
     if (!mounted) return;
-    final streakDays = HiveService.instance.getStreakDays();
-    context.pushReplacement('/training/complete', extra: {
-      'typeName': _type.displayName,
-      'streakDays': streakDays,
-    });
+    context.go('/training');
   }
 
   @override
@@ -347,7 +352,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       case TrainingType.blurClarity:
         return _BlurIdentificationTraining(isPaused: _isPaused);
       case TrainingType.convergence:
-        return _ConvergenceTraining(controller: _trainingController);
+        return _ConvergencePhoneMotionTraining(isPaused: _isPaused, onComplete: _onComplete);
       case TrainingType.saccade:
         return _SaccadeTraining(controller: _trainingController);
       case TrainingType.contrastAdapt:
@@ -866,87 +871,322 @@ class _BlurIdentificationTrainingState
   }
 }
 
-// ④ 輻輳運動トレーニング
-// 2つの光点が左右から中央へ近づき（輻輳）、また離れる（開散）
-// エビデンス: Scheiman et al. (2005) - 輻輳訓練の有効性
-class _ConvergenceTraining extends StatelessWidget {
-  final AnimationController controller;
-  const _ConvergenceTraining({required this.controller});
+// ④ 寄り目トレーニング（輻輳運動）
+// フロントカメラで顔との距離を計測し、画面を近づける動作で実際の輻輳を発生させる
+// エビデンス: CITT-ART (2019, JAMA Ophthalmology) - 成人の輻輳不全への訓練効果
+enum _ConvergencePhase { prepare, approaching, relaxing }
+
+class _ConvergencePhoneMotionTraining extends StatefulWidget {
+  final bool isPaused;
+  final VoidCallback onComplete;
+  const _ConvergencePhoneMotionTraining({required this.isPaused, required this.onComplete});
 
   @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return AnimatedBuilder(
-          animation: controller,
-          builder: (context, _) {
-            // controller.value: 0→1（reverse:true で往復）
-            // 0.0 = 最大開散（左右端）、1.0 = 最大輻輳（中央）
-            final t = controller.value;
-            final centerX = constraints.maxWidth / 2;
-            final centerY = constraints.maxHeight / 2;
-            final maxOffset = constraints.maxWidth * 0.35;
-            final currentOffset = maxOffset * (1.0 - t);
-
-            final leftPos = Offset(centerX - currentOffset, centerY);
-            final rightPos = Offset(centerX + currentOffset, centerY);
-
-            final isConverging = t > 0.5;
-            final label = isConverging ? '目を内側に寄せて' : '目を外側に広げて';
-
-            return Stack(
-              children: [
-                CustomPaint(
-                  painter: _ConvergencePainter(left: leftPos, right: rightPos),
-                  child: const SizedBox.expand(),
-                ),
-                Positioned(
-                  bottom: 40,
-                  left: 0,
-                  right: 0,
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: isConverging
-                          ? AppTheme.primaryLight
-                          : Colors.white54,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
+  State<_ConvergencePhoneMotionTraining> createState() =>
+      _ConvergencePhoneMotionTrainingState();
 }
 
-class _ConvergencePainter extends CustomPainter {
-  final Offset left;
-  final Offset right;
-  _ConvergencePainter({required this.left, required this.right});
+class _ConvergencePhoneMotionTrainingState
+    extends State<_ConvergencePhoneMotionTraining> {
+  // 顔ボックス高さ / 画面高さ の比率キャリブレーション値
+  // 実機 debugMode で計測して調整する
+  static const _farRatio = 0.287; // ~40cm（実機キャリブレーション値）
+  static const _nearRatio = 0.700; // ユーザー最大到達距離
+  static const _holdThreshold = 0.88; // ratio 0.65 付近で判定
+
+  static const _totalSets = 5;
+
+  CameraController? _camera;
+  FaceDetector? _faceDetector;
+  bool _cameraReady = false;
+  bool _processing = false;
+
+  double _distanceT = 0.0; // 0.0 = 遠, 1.0 = 近
+  _ConvergencePhase _phase = _ConvergencePhase.prepare;
+  Timer? _phaseTimer;
+  Timer? _relaxCountdownTimer;
+  int _setCount = 0;
+  int _relaxSeconds = 4;
+
+  bool _debugMode = false;
+  double _debugT = 0.0;
+  double _debugFaceRatio = 0.0;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final glowPaint = Paint()
-      ..color = AppTheme.primary.withValues(alpha: 0.3)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
-    final dotPaint = Paint()..color = AppTheme.primary;
-    final centerPaint = Paint()..color = Colors.white;
+  void initState() {
+    super.initState();
+    _debugMode = HiveService.instance
+        .getSetting('debug_mode_enabled', defaultValue: false) as bool;
+    _initCamera();
+  }
 
-    for (final pos in [left, right]) {
-      canvas.drawCircle(pos, 28, glowPaint);
-      canvas.drawCircle(pos, 18, dotPaint);
-      canvas.drawCircle(pos, 6, centerPaint);
+  Future<void> _initCamera() async {
+    try {
+      final cameras = await availableCameras();
+      final front = cameras.firstWhere(
+        (c) => c.lensDirection == CameraLensDirection.front,
+        orElse: () => cameras.first,
+      );
+      _faceDetector = FaceDetector(
+        options: FaceDetectorOptions(
+          performanceMode: FaceDetectorMode.fast,
+        ),
+      );
+      _camera = CameraController(
+        front,
+        ResolutionPreset.low,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.bgra8888,
+      );
+      await _camera!.initialize();
+      if (!mounted) return;
+      setState(() => _cameraReady = true);
+      _camera!.startImageStream(_processFrame);
+    } catch (e) {
+      debugPrint('カメラ初期化エラー: $e');
+    }
+  }
+
+  void _processFrame(CameraImage image) async {
+    if (_processing || widget.isPaused) return;
+    _processing = true;
+    try {
+      final bytes = image.planes[0].bytes;
+      final metadata = InputImageMetadata(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: InputImageRotation.rotation270deg,
+        format: InputImageFormat.bgra8888,
+        bytesPerRow: image.planes[0].bytesPerRow,
+      );
+      final inputImage = InputImage.fromBytes(bytes: bytes, metadata: metadata);
+      final faces = await _faceDetector!.processImage(inputImage);
+      if (!mounted) return;
+      if (faces.isNotEmpty) {
+        final ratio = faces.first.boundingBox.height / image.height;
+        debugPrint('顔ボックス比率: ${ratio.toStringAsFixed(3)}');
+        final t = ((ratio - _farRatio) / (_nearRatio - _farRatio))
+            .clamp(0.0, 1.0)
+            .toDouble();
+        if (mounted) {
+          setState(() {
+            _distanceT = t;
+            _debugFaceRatio = ratio;
+          });
+          if (_phase == _ConvergencePhase.prepare && t < 0.20) {
+            _onFaceAtStart();
+          } else if (_phase == _ConvergencePhase.approaching && t >= _holdThreshold) {
+            _onFaceNear();
+          }
+        }
+      } else if (_phase == _ConvergencePhase.approaching && _distanceT >= 0.5) {
+        // 顔が検出できないほど近い = 最接近とみなす
+        if (mounted) _onFaceNear();
+      }
+    } finally {
+      _processing = false;
+    }
+  }
+
+  void _onFaceAtStart() {
+    if (_phase != _ConvergencePhase.prepare) return;
+    HapticFeedback.lightImpact();
+    setState(() => _phase = _ConvergencePhase.approaching);
+  }
+
+  void _onFaceNear() {
+    if (_phase != _ConvergencePhase.approaching) return;
+    Timer.periodic(const Duration(milliseconds: 150), (timer) {
+      HapticFeedback.heavyImpact();
+      if (timer.tick >= 3) timer.cancel(); // 3 × 150ms = 450ms
+    });
+    setState(() {
+      _phase = _ConvergencePhase.relaxing;
+      _relaxSeconds = 4;
+    });
+    _relaxCountdownTimer?.cancel();
+    _relaxCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) { timer.cancel(); return; }
+      setState(() => _relaxSeconds--);
+      if (_relaxSeconds <= 0) timer.cancel();
+    });
+    _phaseTimer?.cancel();
+    _phaseTimer = Timer(const Duration(seconds: 4), () {
+      if (!mounted) return;
+      HapticFeedback.heavyImpact();
+      Future.delayed(const Duration(milliseconds: 100), HapticFeedback.heavyImpact);
+      final newCount = _setCount + 1;
+      setState(() {
+        _setCount = newCount;
+        _phase = _ConvergencePhase.prepare;
+      });
+      if (newCount >= _totalSets) {
+        widget.onComplete();
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(_ConvergencePhoneMotionTraining old) {
+    super.didUpdateWidget(old);
+    if (old.isPaused == widget.isPaused) return;
+    if (widget.isPaused) {
+      _phaseTimer?.cancel();
+      try { _camera?.stopImageStream(); } catch (_) {}
+    } else {
+      try { _camera?.startImageStream(_processFrame); } catch (_) {}
     }
   }
 
   @override
-  bool shouldRepaint(_ConvergencePainter old) =>
-      old.left != left || old.right != right;
+  void dispose() {
+    _phaseTimer?.cancel();
+    _relaxCountdownTimer?.cancel();
+    try { _camera?.stopImageStream(); } catch (_) {}
+    _camera?.dispose();
+    _faceDetector?.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _debugMode ? _debugT : _distanceT;
+
+    Widget centerContent;
+    if (_phase == _ConvergencePhase.prepare) {
+      centerContent = Column(
+        key: const ValueKey('prepare'),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '$_setCount / $_totalSets セット',
+            style: const TextStyle(color: Colors.white38, fontSize: 13),
+          ),
+          const SizedBox(height: 48),
+          const Text(
+            '腕を伸ばして\nカメラを顔に向けてください',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white70, fontSize: 18, height: 1.6),
+          ),
+        ],
+      );
+    } else if (_phase == _ConvergencePhase.approaching) {
+      centerContent = Column(
+        key: const ValueKey('approaching'),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '$_setCount / $_totalSets セット',
+            style: const TextStyle(color: Colors.white38, fontSize: 13),
+          ),
+          const SizedBox(height: 48),
+          SizedBox(
+            width: 180,
+            height: 180,
+            child: CustomPaint(painter: _ConvergenceDotPainter(t: t)),
+          ),
+          const SizedBox(height: 48),
+          const Text(
+            '画面をゆっくり顔に近づけて\nターゲットを見ながら目を寄り目にしてください',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.6),
+          ),
+        ],
+      );
+    } else {
+      // relaxing
+      centerContent = Column(
+        key: const ValueKey('relaxing'),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '$_setCount / $_totalSets セット',
+            style: const TextStyle(color: Colors.white38, fontSize: 13),
+          ),
+          const SizedBox(height: 48),
+          Text(
+            '$_relaxSeconds',
+            style: const TextStyle(color: Colors.green, fontSize: 72, fontWeight: FontWeight.w300),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'リラックスしてください',
+            style: TextStyle(color: Colors.green, fontSize: 18),
+          ),
+        ],
+      );
+    }
+
+    return Stack(
+      children: [
+        Center(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: centerContent,
+          ),
+        ),
+        if (_debugMode)
+          Positioned(
+            top: 8,
+            left: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              color: Colors.black54,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'カメラ: ${_cameraReady ? "準備完了" : "初期化中"}',
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                  ),
+                  Text(
+                    '顔ボックス比率: ${_debugFaceRatio.toStringAsFixed(3)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                  ),
+                  Text(
+                    '距離t: ${t.toStringAsFixed(2)}  フェーズ: $_phase',
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                  ),
+                  Slider(
+                    value: _debugT,
+                    onChanged: (v) => setState(() {
+                      _debugT = v;
+                      if (_phase == _ConvergencePhase.prepare && v < 0.20) {
+                        _onFaceAtStart();
+                      } else if (_phase == _ConvergencePhase.approaching && v >= _holdThreshold) {
+                        _onFaceNear();
+                      }
+                    }),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// 近づくほど小さくなる同心円ターゲット（遠=大きい、近=小さい）
+// 色変化なし: 黒外円 → 白中円 → 黒中心点 の固定デザイン
+class _ConvergenceDotPainter extends CustomPainter {
+  final double t; // 0.0 = 遠(大), 1.0 = 近(小)
+  _ConvergenceDotPainter({required this.t});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    const outerR = 80.0; // 黒外円：固定
+    const whiteR = outerR * 0.85; // 白円：固定
+    final innerR = (outerR * (0.45 - 0.35 * t)).clamp(outerR * 0.08, outerR * 0.45); // 黒中心点：縮む
+
+    canvas.drawCircle(center, outerR, Paint()..color = Colors.black);
+    canvas.drawCircle(center, whiteR, Paint()..color = Colors.white);
+    canvas.drawCircle(center, innerR, Paint()..color = Colors.black);
+  }
+
+  @override
+  bool shouldRepaint(_ConvergenceDotPainter old) => old.t != t;
 }
 
 // ⑤ 視点移動（サッカード）トレーニング
@@ -1144,3 +1384,4 @@ class _DistanceAlertDialogState extends State<_DistanceAlertDialog> {
     );
   }
 }
+
