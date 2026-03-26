@@ -61,6 +61,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
   bool _isSmall = true;
   bool _isAnimating = false;
   bool _isCompleting = false;
+  bool _pendingComplete = false;
   Timer? _countdownTimer;
 
   @override
@@ -181,7 +182,11 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       if (_isPaused) return;
       if (_remainingSeconds <= 0) {
         timer.cancel();
-        _onComplete();
+        if (_type == TrainingType.blurClarity) {
+          setState(() => _pendingComplete = true);
+        } else {
+          _onComplete();
+        }
         return;
       }
       setState(() => _remainingSeconds--);
@@ -350,7 +355,11 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       case TrainingType.tracking:
         return _TrackingTraining(controller: _trainingController, speed: TrackingSpeed.medium);
       case TrainingType.blurClarity:
-        return _BlurIdentificationTraining(isPaused: _isPaused);
+        return _BlurIdentificationTraining(
+          isPaused: _isPaused,
+          pendingComplete: _pendingComplete,
+          onComplete: _onComplete,
+        );
       case TrainingType.convergence:
         return _ConvergencePhoneMotionTraining(isPaused: _isPaused, onComplete: _onComplete);
       case TrainingType.saccade:
@@ -667,7 +676,13 @@ enum _IdentPhase { showing, choosing, feedback }
 
 class _BlurIdentificationTraining extends StatefulWidget {
   final bool isPaused;
-  const _BlurIdentificationTraining({required this.isPaused});
+  final bool pendingComplete;
+  final VoidCallback onComplete;
+  const _BlurIdentificationTraining({
+    required this.isPaused,
+    required this.pendingComplete,
+    required this.onComplete,
+  });
 
   @override
   State<_BlurIdentificationTraining> createState() =>
@@ -716,6 +731,10 @@ class _BlurIdentificationTrainingState
   }
 
   void _startRound() {
+    if (widget.pendingComplete) {
+      widget.onComplete();
+      return;
+    }
     // 直前と同じ記号を除外してターゲット選択
     final allSymbols = _symbols;
     final candidates = allSymbols.where((s) => s != _lastTarget).toList();
@@ -762,9 +781,16 @@ class _BlurIdentificationTrainingState
   @override
   void didUpdateWidget(_BlurIdentificationTraining old) {
     super.didUpdateWidget(old);
-    if (old.isPaused == widget.isPaused) return;
+    if (old.isPaused == widget.isPaused && old.pendingComplete == widget.pendingComplete) return;
     if (widget.isPaused) {
       _phaseTimer?.cancel();
+    } else if (!old.pendingComplete && widget.pendingComplete) {
+      // タイマー期限切れ: showing 中なら即 choosing へ移行してユーザーに答えさせる
+      if (_phase == _IdentPhase.showing) {
+        _phaseTimer?.cancel();
+        setState(() => _phase = _IdentPhase.choosing);
+      }
+      // choosing / feedback はそのまま → フィードバック後の _startRound() で pendingComplete を拾う
     } else {
       // 再開: showing フェーズなら新ラウンドをスタート
       if (_phase == _IdentPhase.showing) _startRound();
