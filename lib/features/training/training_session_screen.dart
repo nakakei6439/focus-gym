@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:ui';
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart' show compute;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -137,6 +139,8 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       _runNearFarAnimation(1.0); // 小→大からスタート
     } else if (_type == TrainingType.blurClarity) {
       // Widget 内の initState で自己起動（コントローラー不使用）
+    } else if (_type == TrainingType.gaborPatch) {
+      // Widget 内のタイマーで自己起動（コントローラー不使用）
     } else if (_type == TrainingType.convergence) {
       // Widget 内のカメラで自己制御（コントローラー不使用）
     } else if (_type == TrainingType.tracking) {
@@ -182,7 +186,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       if (_isPaused) return;
       if (_remainingSeconds <= 0) {
         timer.cancel();
-        if (_type == TrainingType.blurClarity) {
+        if (_type == TrainingType.blurClarity || _type == TrainingType.gaborPatch) {
           setState(() => _pendingComplete = true);
         } else {
           _onComplete();
@@ -204,6 +208,8 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
       }
       // _isAnimating が false = タップ待ち状態のまま → 何もしない
     } else if (_type == TrainingType.blurClarity) {
+      // isPaused プロパティ経由で Widget 内制御
+    } else if (_type == TrainingType.gaborPatch) {
       // isPaused プロパティ経由で Widget 内制御
     } else if (_type == TrainingType.convergence) {
       // isPaused プロパティ経由で Widget 内制御
@@ -256,6 +262,8 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
         return '両目を内側・外側に動かしてください';
       case TrainingType.contrastAdapt:
         return '薄い文字を読んでください';
+      case TrainingType.gaborPatch:
+        return '縞模様の向きを答えてください';
     }
   }
 
@@ -295,7 +303,7 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
           Text(_type.displayName, style: TextStyle(color: textColor, fontSize: 16)),
           const Spacer(),
           if (_isStarted)
-            Text(_timeString, style: TextStyle(color: timeColor, fontSize: 22, fontWeight: FontWeight.bold, fontFeatures: const [FontFeature.tabularFigures()]))
+            Text(_timeString, style: TextStyle(color: timeColor, fontSize: 22, fontWeight: FontWeight.bold, fontFeatures: const [ui.FontFeature.tabularFigures()]))
           else
             const SizedBox(width: 60),
         ],
@@ -362,6 +370,12 @@ class _TrainingSessionScreenState extends State<TrainingSessionScreen>
         return _ConvergencePhoneMotionTraining(isPaused: _isPaused, onComplete: _onComplete);
       case TrainingType.contrastAdapt:
         return _ContrastAdaptTraining(controller: _trainingController, phrase: _contrastPhrase);
+      case TrainingType.gaborPatch:
+        return _GaborPatchTraining(
+          isPaused: _isPaused,
+          pendingComplete: _pendingComplete,
+          onComplete: _onComplete,
+        );
     }
   }
 
@@ -843,7 +857,7 @@ class _BlurIdentificationTrainingState
   Widget _buildMainArea() {
     if (_phase == _IdentPhase.showing) {
       return ImageFiltered(
-        imageFilter: ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma),
+        imageFilter: ui.ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma),
         child: Text(
           _target,
           style: const TextStyle(
@@ -1328,6 +1342,340 @@ class _DistanceAlertDialogState extends State<_DistanceAlertDialog> {
           const SizedBox(width: 8),
           Text(text, style: const TextStyle(fontSize: 14)),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ガルボーパッチトレーニング
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// compute()に渡すパラメータ（全フィールドがプリミティブ）
+class _GaborParams {
+  final int size;
+  final double angle;     // ラジアン
+  final double frequency; // cycle/pixel
+  final double sigma;
+  final double contrast;  // 0.0〜1.0
+  const _GaborParams({
+    required this.size,
+    required this.angle,
+    required this.frequency,
+    required this.sigma,
+    required this.contrast,
+  });
+}
+
+/// ガルボーパッチのUint8List(RGBA8888)をオフスレッドで生成するトップレベル関数
+Uint8List _generateGaborPixels(_GaborParams p) {
+  final half = p.size / 2;
+  final pixels = Uint8List(p.size * p.size * 4);
+  int idx = 0;
+  for (int py = 0; py < p.size; py++) {
+    for (int px = 0; px < p.size; px++) {
+      final x = px - half;
+      final y = py - half;
+      // 回転座標
+      final xp = x * cos(p.angle) + y * sin(p.angle);
+      final yp = -x * sin(p.angle) + y * cos(p.angle);
+      // Gaussianエンベロープ
+      final gauss = exp(-(xp * xp + yp * yp) / (2 * p.sigma * p.sigma));
+      // 正弦波キャリア
+      final sine = cos(2 * pi * p.frequency * xp);
+      // 合成: [-1,1] → グレー基準 [0,1]
+      final value = 0.5 + 0.5 * p.contrast * gauss * sine;
+      final gray = (value * 255).round().clamp(0, 255);
+      pixels[idx++] = gray; // R
+      pixels[idx++] = gray; // G
+      pixels[idx++] = gray; // B
+      pixels[idx++] = 255;  // A
+    }
+  }
+  return pixels;
+}
+
+/// ガルボーパッチを描画するCustomPainter
+class _GaborPainter extends CustomPainter {
+  final ui.Image image;
+  const _GaborPainter({required this.image});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint(),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_GaborPainter old) => old.image != image;
+}
+
+enum _GaborPhase { fixation, showing, choosing, feedback }
+
+class _GaborPatchTraining extends StatefulWidget {
+  final bool isPaused;
+  final bool pendingComplete;
+  final VoidCallback onComplete;
+
+  const _GaborPatchTraining({
+    required this.isPaused,
+    required this.pendingComplete,
+    required this.onComplete,
+  });
+
+  @override
+  State<_GaborPatchTraining> createState() => _GaborPatchTrainingState();
+}
+
+class _GaborPatchTrainingState extends State<_GaborPatchTraining> {
+  static const int _patchSize = 200;
+  static const double _frequency = 0.05;
+  static const double _sigma = 30.0;
+  static const double _contrastCorrectFactor = 0.85;
+  static const double _contrastWrongFactor = 1.15;
+  static const double _contrastMin = 0.1;
+  static const double _contrastMax = 1.0;
+  static const int _showDurationMin = 150;
+  static const int _showDurationMax = 800;
+
+  // 4方向の定義（ラジアン角度インデックス: 0=0°, 1=45°, 2=90°, 3=135°）
+  static const _orientationIcons = [
+    Icons.arrow_forward_rounded,  // 0° 水平
+    Icons.north_east_rounded,     // 45°
+    Icons.arrow_upward_rounded,   // 90° 垂直
+    Icons.north_west_rounded,     // 135°
+  ];
+
+  final _random = Random();
+  _GaborPhase _phase = _GaborPhase.fixation;
+  int _angleIndex = 0;
+  bool? _isCorrect;
+  int _correctCount = 0;
+  int _totalCount = 0;
+  Timer? _phaseTimer;
+  ui.Image? _gaborImage;
+  bool _imageLoading = false;
+
+  double _contrast = 0.8;
+  int _showDurationMs = 500;
+
+  @override
+  void initState() {
+    super.initState();
+    _startRound();
+  }
+
+  @override
+  void didUpdateWidget(_GaborPatchTraining old) {
+    super.didUpdateWidget(old);
+    if (widget.isPaused == old.isPaused && widget.pendingComplete == old.pendingComplete) return;
+
+    if (widget.isPaused) {
+      _phaseTimer?.cancel();
+    } else if (!old.pendingComplete && widget.pendingComplete) {
+      // タイマー切れ: showing中なら即choosingへ
+      if (_phase == _GaborPhase.showing) {
+        _phaseTimer?.cancel();
+        setState(() => _phase = _GaborPhase.choosing);
+      }
+    } else if (!widget.isPaused && old.isPaused) {
+      // 一時停止解除: 現在フェーズに応じて再開
+      if (_phase == _GaborPhase.fixation) {
+        _phaseTimer = Timer(const Duration(milliseconds: 300), _showGabor);
+      } else if (_phase == _GaborPhase.showing) {
+        _phaseTimer = Timer(Duration(milliseconds: _showDurationMs), () {
+          if (!mounted) return;
+          setState(() => _phase = _GaborPhase.choosing);
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _phaseTimer?.cancel();
+    _gaborImage?.dispose();
+    super.dispose();
+  }
+
+  void _startRound() {
+    if (widget.pendingComplete) {
+      widget.onComplete();
+      return;
+    }
+    setState(() => _phase = _GaborPhase.fixation);
+    _phaseTimer = Timer(const Duration(milliseconds: 300), _showGabor);
+  }
+
+  Future<void> _showGabor() async {
+    if (!mounted) return;
+    _angleIndex = _random.nextInt(4);
+    final angleRad = _angleIndex * (pi / 4);
+
+    setState(() {
+      _phase = _GaborPhase.showing;
+      _imageLoading = true;
+    });
+
+    // オフスレッドでピクセル生成
+    final params = _GaborParams(
+      size: _patchSize,
+      angle: angleRad,
+      frequency: _frequency,
+      sigma: _sigma,
+      contrast: _contrast,
+    );
+    final pixels = await compute(_generateGaborPixels, params);
+
+    if (!mounted) return;
+
+    // UIスレッドでui.Imageに変換
+    final completer = Completer<ui.Image>();
+    ui.decodeImageFromPixels(
+      pixels, _patchSize, _patchSize, ui.PixelFormat.rgba8888,
+      (img) => completer.complete(img),
+    );
+    final image = await completer.future;
+
+    if (!mounted) return;
+    setState(() {
+      _gaborImage = image;
+      _imageLoading = false;
+    });
+
+    if (widget.isPaused) return;
+
+    _phaseTimer = Timer(Duration(milliseconds: _showDurationMs), () {
+      if (!mounted) return;
+      setState(() => _phase = _GaborPhase.choosing);
+    });
+  }
+
+  void _onChoiceTap(int choiceIndex) {
+    if (_phase != _GaborPhase.choosing) return;
+    final correct = choiceIndex == _angleIndex;
+
+    // 適応的難易度調整
+    if (correct) {
+      _contrast = (_contrast * _contrastCorrectFactor).clamp(_contrastMin, _contrastMax);
+      _showDurationMs = (_showDurationMs * 0.9).round().clamp(_showDurationMin, _showDurationMax);
+    } else {
+      _contrast = (_contrast * _contrastWrongFactor).clamp(_contrastMin, _contrastMax);
+      _showDurationMs = (_showDurationMs * 1.1).round().clamp(_showDurationMin, _showDurationMax);
+    }
+
+    HapticFeedback.lightImpact();
+    setState(() {
+      _isCorrect = correct;
+      _phase = _GaborPhase.feedback;
+      if (correct) _correctCount++;
+      _totalCount++;
+    });
+
+    _phaseTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      _startRound();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            _totalCount == 0
+                ? '縞模様の向きを選んでください'
+                : '正解率: ${(_correctCount / _totalCount * 100).round()}%  ($_totalCount問)',
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+        ),
+        Expanded(
+          child: Center(child: _buildMainArea()),
+        ),
+        if (_phase == _GaborPhase.choosing) _buildChoiceButtons(),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildMainArea() {
+    const bgColor = Color(0xFF808080);
+    final double size = _patchSize.toDouble();
+
+    switch (_phase) {
+      case _GaborPhase.fixation:
+        return Container(
+          width: size,
+          height: size,
+          color: bgColor,
+          child: const Center(
+            child: Text(
+              '+',
+              style: TextStyle(color: Colors.black, fontSize: 36, fontWeight: FontWeight.bold),
+            ),
+          ),
+        );
+
+      case _GaborPhase.showing:
+        if (_imageLoading || _gaborImage == null) {
+          return Container(width: size, height: size, color: bgColor);
+        }
+        return SizedBox(
+          width: size,
+          height: size,
+          child: CustomPaint(painter: _GaborPainter(image: _gaborImage!)),
+        );
+
+      case _GaborPhase.choosing:
+        return Container(width: size, height: size, color: bgColor);
+
+      case _GaborPhase.feedback:
+        return Container(
+          width: size,
+          height: size,
+          color: bgColor,
+          child: Center(
+            child: Icon(
+              _isCorrect! ? Icons.check_circle_rounded : Icons.cancel_rounded,
+              color: _isCorrect! ? AppTheme.primaryLight : Colors.redAccent,
+              size: 72,
+            ),
+          ),
+        );
+    }
+  }
+
+  Widget _buildChoiceButtons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: List.generate(4, (i) {
+          return GestureDetector(
+            onTap: () => _onChoiceTap(i),
+            child: Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                color: Colors.white12,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(
+                child: Icon(
+                  _orientationIcons[i],
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }

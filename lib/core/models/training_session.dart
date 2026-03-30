@@ -32,6 +32,9 @@ enum TrainingType {
 
   @HiveField(5)
   contrastAdapt,
+
+  @HiveField(6)
+  gaborPatch,
 }
 
 extension TrainingTypeExtension on TrainingType {
@@ -47,6 +50,8 @@ extension TrainingTypeExtension on TrainingType {
         return '寄り目トレーニング';
       case TrainingType.contrastAdapt:
         return 'コントラスト順応';
+      case TrainingType.gaborPatch:
+        return 'ガルボーパッチ';
     }
   }
 
@@ -62,6 +67,8 @@ extension TrainingTypeExtension on TrainingType {
         return '画面を顔に近づけて\n輻輳筋を直接トレーニング';
       case TrainingType.contrastAdapt:
         return '薄いグレーの文字に焦点を合わせて\nコントラスト感度を鍛える';
+      case TrainingType.gaborPatch:
+        return 'ガルボーパッチの縞模様を識別して\nコントラスト感度と視力を鍛える';
     }
   }
 
@@ -77,6 +84,8 @@ extension TrainingTypeExtension on TrainingType {
         return '👀';
       case TrainingType.contrastAdapt:
         return '🌗';
+      case TrainingType.gaborPatch:
+        return '〰️';
     }
   }
 
@@ -92,6 +101,8 @@ extension TrainingTypeExtension on TrainingType {
         return Icons.compare_arrows_rounded;
       case TrainingType.contrastAdapt:
         return Icons.contrast_rounded;
+      case TrainingType.gaborPatch:
+        return Icons.grain_rounded;
     }
   }
 }
